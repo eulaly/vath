@@ -53,13 +53,32 @@ Should be run manually, separate from scraper. You may use scrapy, but are not r
 5. capture issue/topic tags for later grouping, may be empty
 6. use .env for api key management
 7. document the exact prompt version used; prompt text may live in code or docs, but must have a version string/hash in output records
+8. for this run, an option to run the first N comments (5, 10, 20, 50) - will add batch processing later
    
 ** notes
+- analysis/gpt4o/analysis.py: standalone script; core functions importable for tests.
+- Prompt version = SHA-256[:7] of SYSTEM_PROMPT+USER_TEMPLATE; auto-updates on prompt change.
+- Output: analysis/gpt4o/forum{id}_{scrape_ts}_{model}_{run_ts}.jsonl, one record per comment.
+- --limit {5,10,20,50} for test runs; omit for full corpus. Batch processing planned for later.
+- Incremental flush after each record: safe to interrupt and inspect partial output.
+- temperature=0.0 for deterministic, reproducible classifications across runs.
+- Retry: 3 attempts (delays 1s, 2s) on RateLimitError; all other exceptions → error record + continue.
+- openai==2.34.0 installed; python-dotenv already present; key loaded from .env via OPENAI_API_KEY.
+- MAX_COMMENT_CHARS=6000: covers >99% without truncation; outliers (e.g. 18k-char law firm brief) flagged with truncated=True.
 
 ** evidence
-- commit: 
-- tests: 
-- date: 
+- commit:
+- tests: 20 passing (pytest tests/test_gpt4o_analysis.py), 28 total across suite
+  python ./analysis/gpt4o/analysis.py --limit 5 ./output/f452.jsonl
+- date: [2026-05-05]
+
+* [ ] t1.2.1: 4o with batch processing
+** acceptance criteria
+1. input scraped jsonl doc by filename/path, and process the whole thing via batch processing
+** evidence
+- commit:
+- tests:
+- date:
 
 * [ ] X: complete proposal information
 Ensure we capture as much useful information as possible about the actual proposal - contact information, etc. what the state actually says about what was posted. 
