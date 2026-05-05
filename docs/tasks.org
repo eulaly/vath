@@ -2,20 +2,36 @@
 Use https://www.townhall.virginia.gov/L/comments.cfm?GDocForumID=452 as the first forum. Scraper should be run manually at this step.
 ViewComments (townhall.virginia.gov/L/ViewComments.cfm?CommentID=#) appears to be raw list of all comments on forum - could be useful later for whole-scrape
 Append forum id to viewall per forum (townhall.virginia.gov/L/ViewComments.cfm?GdocForumID=452)
-Comments are hydrated in backend via js-cued button (AJAX?)
+Comments are hydrated in backend via js-cued button (AJAX?).
 ** acceptance criteria
 1. run manual scraper
    1. store proposal title and description
    2. store comment title, commenter, date
    3. store relevant metadata
 2. friendly/polite scraping
-  
+3. store forum as distinct item with title, desc
+4. add forum ID in comment filename, eg forum452_comments_<datetime>.jsonl
+5. remove reg_title and reg_desc from each comment; these belong in forum item
+6. parse datetimes into object for later use (plotting)
+   
 ** notes
+- scraper/spiders/forum.py — ForumSpider using ViewComments.cfm?GdocForumID=N with POST pagination. First request fetches page 1 (vPerPage=500), discovers the last page number from the form's link, generates all remaining page requests upfront. Parses each div.Cbox for all required fields.
+- scraper/items.py — CommentItem with forum_id, reg_title, reg_desc, comment_id, author, date, title, text
+- tests/test_forum_spider.py — 7 tests, all passing
+- Settings: DEFAULT_RESPONSE_ENCODING=utf-8 (fixes Windows-1251 meta-tag mismatch), HTTPCACHE_ENABLED=True, feed output to output/
+- ViewComments.cfm instead of comments.cfm: POST to Comments.cfm returned a 500 error (wrong endpoint). ViewComments.cfm?GdocForumID=N is the correct listing URL, returns full comment text on the page itself — no per-comment follow requests needed.
+- Span-wrapped text: .divComment p::text missed 3.6% of comments where text is in <p><span>text</span></p>. Fixed to .divComment *::text, .divComment::text. Worth knowing for when the spider is extended to other forums.
+- start() vs start_requests(): Scrapy 2.13+ deprecates start_requests() in favor of async def start()
+- ForumItem vs CommentItem: ForumItem (forum_id, reg_title, reg_desc) yielded once on first page; CommentItem no longer carries reg_title/reg_desc. Both land in the same JSONL feed.
+- Dynamic output filename: set via from_crawler() overriding FEEDS at 'spider' priority — format is output/forum{id}_comments_%(time)s.jsonl. FEEDS removed from settings.py; spider owns it.
+- Date parsing: _parse_date() normalizes whitespace, upper-cases, parses "%m/%d/%y %I:%M %p" → ISO 8601; falls back to raw string on failure.
 
 ** evidence
-- commit: beb5cf4
-- tests: 7 passing (pytest tests/)
-- datetime: 2026-05-05 12:26
+- commit: beb5cf4 (AC1-2), <commit> (AC3-6)
+- tests: 8 passing (`python -m pytest tests -q`) or (`python -m pytest tests/`)
+   - `scrapy crawl forum -a forum_id=452 -s LOG_LEVEL=WARNING 2>&1`
+   - retrieved 9083 comments
+- datetime: 2026-05-05
 
 * [ ] t1.2: initial analysis pipeline
 Write a simple pipeline for both - prefer non-concurrent/async from scraping run. Should be run manually, separate from scraper. You may use scrapy, but are not required to.
@@ -29,3 +45,10 @@ Write a simple pipeline for both - prefer non-concurrent/async from scraping run
 - commit: 
 - tests: 
 - date: 
+
+* [ ] X: complete proposal information
+Ensure we capture as much useful information as possible about the actual proposal - contact information, etc. what the state actually says about what was posted. 
+** acceptance criteria
+1. Item: `Forum` stores id, url, proposal title, description, open/close date, number of comments, agency, board, guidance document id
+   - add details for guidanceDoc, publication date, comments, guidance docs - eg: https://www.townhall.virginia.gov/L/GDocForum.cfm?GDocForumID=452
+2. Item: `Comment` stores forum_id, comment_id, author, title, text, date, url

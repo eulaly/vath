@@ -80,14 +80,7 @@ HTTPCACHE_ENABLED = True
 HTTPCACHE_EXPIRATION_SECS = 86400  # 24 h
 HTTPCACHE_DIR = "httpcache"
 
-# Output
-FEEDS = {
-    "output/%(name)s_%(time)s.jsonl": {
-        "format": "jsonlines",
-        "encoding": "utf-8",
-        "overwrite": False,
-    }
-}
+# Output filename is set dynamically by each spider via from_crawler (includes forum_id).
 
 # The site declares windows-1251 in a meta tag but sends valid UTF-8 bytes.
 # Force UTF-8 to prevent lxml from re-decoding via the meta charset.

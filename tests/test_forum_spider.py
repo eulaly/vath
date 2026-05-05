@@ -1,8 +1,10 @@
 """Tests for ForumSpider parsing logic using fake HTML responses."""
 
+import scrapy
 from scrapy.http import HtmlResponse, Request
 
-from scraper.spiders.forum import ForumSpider
+from scraper.items import CommentItem, ForumItem
+from scraper.spiders.forum import ForumSpider, _parse_date
 
 
 def fake_response(url, body, meta=None):
@@ -120,9 +122,24 @@ def test_page1_yields_items():
         meta={"is_first": True},
     )
     results = list(spider.parse_comments(response))
-    from scraper.items import CommentItem
     items = [r for r in results if isinstance(r, CommentItem)]
     assert len(items) == 2
+
+
+def test_page1_yields_forum_item():
+    spider = make_spider()
+    response = fake_response(
+        "https://www.townhall.virginia.gov/L/ViewComments.cfm?GdocForumID=452",
+        PAGE1_HTML,
+        meta={"is_first": True},
+    )
+    results = list(spider.parse_comments(response))
+    forum_items = [r for r in results if isinstance(r, ForumItem)]
+    assert len(forum_items) == 1
+    fi = forum_items[0]
+    assert "Transgender Students" in fi["reg_title"]
+    assert "House Bill 145" in fi["reg_desc"]
+    assert fi["forum_id"] == "452"
 
 
 def test_comment_fields_parsed_correctly():
@@ -132,7 +149,6 @@ def test_comment_fields_parsed_correctly():
         PAGE1_HTML,
         meta={"is_first": True},
     )
-    from scraper.items import CommentItem
     items = [r for r in spider.parse_comments(response) if isinstance(r, CommentItem)]
     item = items[0]
     assert item["comment_id"] == "101"
@@ -140,34 +156,18 @@ def test_comment_fields_parsed_correctly():
     assert item["title"] == "I strongly support this"
     assert "great policy" in item["text"]
     assert "All schools" in item["text"]  # multi-paragraph joined
-    assert "1/4/21" in item["date"]
+    assert "reg_title" not in item
+    assert "reg_desc" not in item
 
 
-def test_reg_context_extracted():
-    spider = make_spider()
-    response = fake_response(
-        "https://www.townhall.virginia.gov/L/ViewComments.cfm?GdocForumID=452",
-        PAGE1_HTML,
-        meta={"is_first": True},
-    )
-    from scraper.items import CommentItem
-    items = [r for r in spider.parse_comments(response) if isinstance(r, CommentItem)]
-    item = items[0]
-    assert "Transgender Students" in item["reg_title"]
-    assert "House Bill 145" in item["reg_desc"]
-
-
-def test_subsequent_page_uses_meta_reg_context():
+def test_subsequent_page_yields_comments():
     spider = make_spider()
     response = fake_response(
         "https://www.townhall.virginia.gov/L/ViewComments.cfm?GdocForumID=452",
         PAGE2_HTML,
-        meta={"reg_title": "Test Reg", "reg_desc": "Full description text"},
     )
-    from scraper.items import CommentItem
     items = [r for r in spider.parse_comments(response) if isinstance(r, CommentItem)]
     assert len(items) == 1
-    assert items[0]["reg_title"] == "Test Reg"
     assert items[0]["author"] == "Carol T"
 
 
@@ -181,7 +181,11 @@ def test_last_page_detection():
     assert spider._last_page(response) == 3
 
 
-import scrapy
+def test_date_parsed_to_iso():
+    assert _parse_date("1/4/21  9:15 am") == "2021-01-04T09:15:00"
+    assert _parse_date("1/5/21  10:00 am") == "2021-01-05T10:00:00"
+    assert _parse_date("unparseable") == "unparseable"
+
 
 SPAN_WRAPPED_HTML = """
 <html><body>
@@ -221,7 +225,6 @@ def test_span_wrapped_text_is_extracted():
         SPAN_WRAPPED_HTML,
         meta={"is_first": True},
     )
-    from scraper.items import CommentItem
     items = [r for r in spider.parse_comments(response) if isinstance(r, CommentItem)]
     assert len(items) == 1
     assert "Text inside a span element" in items[0]["text"]

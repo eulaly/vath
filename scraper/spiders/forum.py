@@ -1,10 +1,9 @@
-import math
 import re
-from urllib.parse import urlencode
+from datetime import datetime
 
 import scrapy
 
-from scraper.items import CommentItem
+from scraper.items import CommentItem, ForumItem
 
 _BASE = "https://www.townhall.virginia.gov/L/ViewComments.cfm"
 _NBSP = "\xa0"
@@ -15,6 +14,14 @@ def _view_url(forum_id):
     return f"{_BASE}?GdocForumID={forum_id}"
 
 
+def _parse_date(raw):
+    normalized = " ".join(raw.split()).upper()
+    try:
+        return datetime.strptime(normalized, "%m/%d/%y %I:%M %p").isoformat()
+    except ValueError:
+        return raw
+
+
 class ForumSpider(scrapy.Spider):
     name = "forum"
     allowed_domains = ["townhall.virginia.gov"]
@@ -22,6 +29,22 @@ class ForumSpider(scrapy.Spider):
     # Override at runtime: scrapy crawl forum -a forum_id=452
     forum_id = "452"
     per_page = 500
+
+    @classmethod
+    def from_crawler(cls, crawler, *args, **kwargs):
+        spider = super().from_crawler(crawler, *args, **kwargs)
+        crawler.settings.set(
+            "FEEDS",
+            {
+                f"output/forum{spider.forum_id}_comments_%(time)s.jsonl": {
+                    "format": "jsonlines",
+                    "encoding": "utf-8",
+                    "overwrite": False,
+                }
+            },
+            priority="spider",
+        )
+        return spider
 
     async def start(self):
         yield scrapy.FormRequest(
@@ -36,26 +59,27 @@ class ForumSpider(scrapy.Spider):
         if response.meta.get("is_first"):
             reg_title, reg_desc = self._reg_context(response)
             last_page = self._last_page(response)
+            yield ForumItem(
+                forum_id=self.forum_id,
+                reg_title=reg_title,
+                reg_desc=reg_desc,
+            )
             for page in range(2, last_page + 1):
                 yield scrapy.FormRequest(
                     _view_url(self.forum_id),
                     formdata={"vPage": str(page), "vPerPage": str(self.per_page), "sub1": "go"},
                     callback=self.parse_comments,
-                    meta={"reg_title": reg_title, "reg_desc": reg_desc},
                 )
-        else:
-            reg_title = response.meta["reg_title"]
-            reg_desc = response.meta["reg_desc"]
 
         for box in response.css("div.Cbox"):
-            yield self._parse_box(box, reg_title, reg_desc)
+            yield self._parse_box(box)
 
     # ------------------------------------------------------------------
-    def _parse_box(self, box, reg_title, reg_desc):
+    def _parse_box(self, box):
         cbox_id = box.attrib.get("id", "")
         comment_id = cbox_id[len("cbox"):] if cbox_id.startswith("cbox") else ""
 
-        date = (
+        date_raw = (
             box.css("div[style*='float: right'] div::text").get("")
             .replace(_NBSP, " ").strip()
         )
@@ -75,11 +99,9 @@ class ForumSpider(scrapy.Spider):
 
         return CommentItem(
             forum_id=self.forum_id,
-            reg_title=reg_title,
-            reg_desc=reg_desc,
             comment_id=comment_id,
             author=author,
-            date=date,
+            date=_parse_date(date_raw),
             title=title,
             text=text,
         )
@@ -88,14 +110,12 @@ class ForumSpider(scrapy.Spider):
     def _reg_context(self, response):
         # Page shows: <strong>Guidance Document Change:</strong> description text...
         label_node = response.xpath('//strong[contains(text(),"Change:")]')
-        label_text = label_node.css("::text").get("").strip()
 
         # Collect all sibling text nodes following the label
         siblings = label_node.xpath("following-sibling::text()").getall()
         raw = " ".join(t.strip() for t in siblings if t.strip())
         raw = raw.replace(_NBSP, " ").replace(_REPLACEMENT_CHAR, "'").strip()
 
-        # reg_desc is the full description text
         reg_desc = raw
 
         # reg_title: text up to the first "was " clause or first 200 chars
