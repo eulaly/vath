@@ -1,3 +1,7 @@
+#+title: VATH Task Log
+#+date: [2026-05-05 Tue]
+#+startup: Overview
+
 * [X] t1.1: scrape one forum (1)
 Use https://www.townhall.virginia.gov/L/comments.cfm?GDocForumID=452 as the first forum. Scraper should be run manually at this step.
 ViewComments (townhall.virginia.gov/L/ViewComments.cfm?CommentID=#) appears to be raw list of all comments on forum - could be useful later for whole-scrape
@@ -68,21 +72,38 @@ Should be run manually, separate from scraper. You may use scrapy, but are not r
 
 ** evidence
 - commit: d834d18
-- tests: 20 passing (pytest tests/test_gpt4o_analysis.py), 28 total across suite
-  - `python ./analysis/gpt4o/analysis.py --limit 5 ./output/f452.jsonl`
+- tests: 20 passing (pytest tests/analysis_gpt4o_realtime.py), 28 total across suite
+  - `python ./analysis/gpt4o/analysis_realtime.py --limit 5 ./output/f452.jsonl`
   - see: ./analysis/gpt4o/forum452_unknown_gpt-4o_2026-05-05T18-48-32+00-00.jsonl
 - date: [2026-05-05 Tue 15:00]
 
-* [ ] t1.2.1: 4o with batch processing
+* [ ] t1.2.1: batch processing
+Create analysis-batch.py to capture same elements as t1.2 above. 
+May need to add multiple commands to upload, check batch status, download, etc.
+Commands should all be run manually.
+Reference: ./docs/openai-batch.md. openai batch output order is not guaranteed, so custom_id is mandatory for reconciliation
 ** acceptance criteria
 1. input scraped jsonl doc by filename/path, and process the whole thing via batch processing
-
+   - ignore non-comment items in jsonl
+   - do not modify raw scraper output
+   - specify model and prompt
+2. output a run manifest in ./analysis/<model>/runs/<run_id>.json
+   - include: include run_id, input_filename, input_sha256, prompt_hash, model, batch_id, records_submitted, records_completed, records_failed, request_filename, raw_output_filename, normalized_output_filename, created_at, completed_at
+3. add tests without live api calls
 ** notes
+- analysis/gpt4o/analysis-batch.py with three subcommands:
+  - `submit`: reads scraped JSONL, builds batch request file (requests/<run_id>.jsonl), uploads to Files API, creates batch, saves manifest to runs/<run_id>.json. Prints run_id to stdout for scripting.
+  - `status`: retrieves batch from OpenAI, prints status + counts, updates manifest.
+  - `download`: downloads raw output to raw/<run_id>.jsonl, normalizes to <run_id>_<model>.jsonl using comment_lookup keyed by comment_id for reconciliation (batch output order not guaranteed). Updates manifest with filenames, counts, completed_at.
+- custom_id format: comment_{comment_id} — unique within a forum, stable across runs.
+- PROMPT_VERSION derived from analysis/prompt-1.txt (same file as realtime); both scripts produce matching prompt_hash in all records.
+- analysis/prompt-1.txt: system prompt as plaintext, read at import time by both scripts. Edit here to change prompt for both pipelines.
+- Tests use importlib.util to load hyphenated filenames; monkeypatch for RUNS_DIR in save/load test.
 
 ** evidence
 - commit:
-- tests:
-- date:
+- tests: 18 passing (pytest tests/analysis_gpt4o_batch.py), 46 total across suite
+- datetime: [2026-05-05 Tue 17:00]
 
 * [ ] X: complete proposal information
 Ensure we capture as much useful information as possible about the actual proposal - contact information, etc. what the state actually says about what was posted. 

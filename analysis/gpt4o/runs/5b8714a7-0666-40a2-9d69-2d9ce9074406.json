@@ -1,0 +1,16 @@
+{
+  "run_id": "5b8714a7-0666-40a2-9d69-2d9ce9074406",
+  "input_filename": "output\\f452.jsonl",
+  "input_sha256": "59dcc8b13cc2a386977a8b934c498c7e639b7e684a94ca1bfd10a14878670018",
+  "prompt_hash": "cb41250",
+  "model": "gpt-4o",
+  "batch_id": "batch_69fa579c7cd081909c049715838df6c6",
+  "records_submitted": 9083,
+  "records_completed": 0,
+  "records_failed": 0,
+  "request_filename": "C:\\Users\\moses\\projects\\vath\\analysis\\gpt4o\\requests\\5b8714a7-0666-40a2-9d69-2d9ce9074406.jsonl",
+  "raw_output_filename": null,
+  "normalized_output_filename": null,
+  "created_at": "2026-05-05T20:48:28.268022+00:00",
+  "completed_at": null
+}
