@@ -33,7 +33,7 @@ Comments are hydrated in backend via js-cued button (AJAX?).
    - retrieved 9083 comments
 - datetime: [2026-05-05 Tue 14:00]
 
-* [ ] t1.2: initial 4o sentiment
+* [X] t1.2: initial 4o sentiment
 Write a simple manual pipeline for gpt-4o that reads one scraped forum jsonl file and roduces a separate analyzed jsonl file. this step must not mutate scraper output. analysis should classify each comment for regulatory stance, generic tone/sentiment, confidence, and enough rationale/evidence to support later dashboard drilldown.
 Should be run manually, separate from scraper. You may use scrapy, but are not required to.
 - Sentiment is derived, not scraped - keep separate from raw comments.
@@ -69,7 +69,8 @@ Should be run manually, separate from scraper. You may use scrapy, but are not r
 ** evidence
 - commit: d834d18
 - tests: 20 passing (pytest tests/test_gpt4o_analysis.py), 28 total across suite
-  python ./analysis/gpt4o/analysis.py --limit 5 ./output/f452.jsonl
+  - `python ./analysis/gpt4o/analysis.py --limit 5 ./output/f452.jsonl`
+  - see: ./analysis/gpt4o/forum452_unknown_gpt-4o_2026-05-05T18-48-32+00-00.jsonl
 - date: [2026-05-05 Tue 15:00]
 
 * [ ] t1.2.1: 4o with batch processing
