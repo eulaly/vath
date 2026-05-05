@@ -1,16 +1,19 @@
 
 # Table of Contents
 
-1.  [Project Goals](#org863a759)
-2.  [Architecture](#orgcd91fd0)
-    1.  [Scraper](#org3256ad3)
-    2.  [Storage](#org7a9a92c)
-    3.  [Analysis](#org6ed72dc)
-3.  [Roadmap](#org416f14d)
+1.  [Project Goals](#org5acb669)
+    1.  [Document and analyze sentiment](#org9291576)
+    2.  [Make data available](#org8054421)
+    3.  [Generalize](#orgdda4b6f)
+2.  [Architecture](#org1d6bc40)
+    1.  [Scraper](#org4298028)
+    2.  [Storage](#org1cd413c)
+    3.  [Analysis](#orgaea450e)
+3.  [Roadmap](#org6b7660d)
 
 
 
-<a id="org863a759"></a>
+<a id="org5acb669"></a>
 
 # Project Goals
 
@@ -21,7 +24,30 @@
 3.  Generalize to other public comment tools.
 
 
-<a id="orgcd91fd0"></a>
+<a id="org9291576"></a>
+
+## Document and analyze sentiment
+
+-   Scrape the data, parse, clean, and store. Clearly separate scraper from sentiment analyzer for maximum auditability.
+-   Build tests for identifying abuse, such as spam and account fraud
+-   Identify any patterns connecting measured sentiment against VA decisions
+
+
+<a id="org8054421"></a>
+
+## Make data available
+
+-   Pick a good visualization tool
+
+
+<a id="orgdda4b6f"></a>
+
+## Generalize
+
+-   Identify scalable ways to apply this toolset to similar problems
+
+
+<a id="org1d6bc40"></a>
 
 # Architecture
 
@@ -31,7 +57,7 @@
 4.  Display: TBD
 
 
-<a id="org3256ad3"></a>
+<a id="org4298028"></a>
 
 ## Scraper
 
@@ -42,14 +68,14 @@ Scrapy provides a simple mechanism for browsing and
 3.  Individual comment page: \`viewcomments.cfm?commentid=X\` - shows regulation title + brief description at the top, plus the comment
 
 
-<a id="org7a9a92c"></a>
+<a id="org1cd413c"></a>
 
 ## Storage
 
 One JSONL file per forum/bill.
 
 
-<a id="org6ed72dc"></a>
+<a id="orgaea450e"></a>
 
 ## Analysis
 
@@ -121,7 +147,7 @@ Google and Amazon both return generic sentiment (tone of writing: positive/negat
 </table>
 
 
-<a id="org416f14d"></a>
+<a id="org6b7660d"></a>
 
 # Roadmap
 
