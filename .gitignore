@@ -1,0 +1,26 @@
+# --- python bytecode ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- environment files ---
+.env
+.env.*
+*.local
+.venv/
+venv/
+env/
+
+# --- emacs ---
+*~
+\#*\#
+.\#*
+*.elc
+
+# --- project private data ---
+/private/
+archive/
+
+
+# --- misc ---
+.DS_Store

@@ -1,0 +1,53 @@
+#+title: VA Townhall
+#+date: [2026-05-05 Tue]
+#+version: 1
+
+* Project Goals
+1. Document and analyze sentiment of public comments on Virginia law, to determine:
+   1. the utility of this forum as a mechanism for public comment, and
+   2. the impact of this forum on Virginia regulation.
+2. Make data and insights broadly available.
+3. Generalize to other public comment tools.
+
+** Document and analyze sentiment
+- Scrape the data, parse, clean, and store. Clearly separate scraper from sentiment analyzer for maximum auditability.
+- Build tests for identifying abuse, such as spam and account fraud
+- Identify any patterns connecting measured sentiment against VA decisions
+  
+** Make data available
+- Pick a good visualization tool
+
+** Generalize
+- Identify scalable ways to apply this toolset to similar problems
+
+* Architecture
+1. Scrape/Parse: **Scrapy** for downloading comments
+2. Storage: json
+3. Sentiment analysis: Claude haiku
+4. Display: TBD   
+
+** Scraper
+Scrapy provides a simple mechanism for browsing and 
+1. Forums listing page: `Forums.cfm` - lists all open forums with agency, reg title, action type, brief description, closing date, comment count
+2. Comment listing page: `comments.cfm?GDocForumID=X` or `comments.cfm?stageid=X` or `comments.cfm?petitionid=X` - lists comments with title, author, date
+3. Individual comment page: `viewcomments.cfm?commentid=X` - shows regulation title + brief description at the top, plus the comment
+
+** Storage
+One JSONL file per forum/bill.
+
+** Analysis
+Google and Amazon both return generic sentiment (tone of writing: positive/negative), not stance (for/against the regulation): "I strongly believe the government should NOT interfere" is negative tone but "against" the regulation.  We will run the forum/bill title and cache the entirety of the proposed change, perhaps as a fallback.
+
+| Tool              | Output                         | Context    | Sarcasm          | Context window | Cost/1k comments |
+|-------------------+--------------------------------+------------+------------------+----------------+------------------|
+| Google NL API     | -1→+1, magnitude               | No/generic | Poorly           | No             | ~$1–2            |
+| Amazon Comprehend | Pos/Neg/Neutral/Mixed          | No/generic | Poorly           | No             | ~$0.10           |
+| Claude Haiku      | Prompted → for/against/neutral | Yes        | Yes, with prompt | Yes            | ~$0.10–0.30      |
+| GPT-4o-mini       | Prompted → same                | Yes        | Yes              | Yes            | ~$0.05–0.15      |
+
+* Roadmap
+1. Scrape one forum
+2. Compare sentiment models
+3. Display   
+4. Scrape all data
+5. Scale?

@@ -1,0 +1,28 @@
+* [ ] t1.1: scrape one forum (1)
+Use https://www.townhall.virginia.gov/L/comments.cfm?GDocForumID=452 as the first forum. Scraper should be run manually at this step.
+** acceptance criteria
+1. run manual scraper
+   1. store proposal title and description
+   2. store comment title, commenter, date
+   3. store relevant metadata
+2. friendly/polite scraping
+  
+** notes
+
+** evidence
+- commit: 
+- tests: 
+- datetime: 
+
+* [ ] t1.2: initial analysis pipeline
+Write a simple pipeline for both - prefer non-concurrent/async from scraping run. Should be run manually, separate from scraper. You may use scrapy, but are not required to.
+** acceptance criteria
+1. run manual sentiment analysis of selected file against haiku
+2. run manual sentiment analysis of selected file against gpt-4o
+
+** notes
+
+** evidence
+- commit: 
+- tests: 
+- date: 
