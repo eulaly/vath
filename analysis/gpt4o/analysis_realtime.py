@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-analysis/gpt4o/analysis.py — Manual GPT-4o sentiment pipeline for VA Townhall comments.
+analysis/gpt4o/analysis-realtime.py — Synchronous GPT-4o pipeline for VA Townhall comments.
 
 Usage:
-    python analysis/gpt4o/analysis.py <input_jsonl> [--limit {5,10,20,50}] [--model MODEL]
+    python analysis/gpt4o/analysis-realtime.py <input_jsonl> [--limit {5,10,20,50}] [--model MODEL]
 
 Output:
     analysis/gpt4o/forum{id}_{scrape_ts}_{model}_{run_ts}.jsonl
@@ -28,33 +28,11 @@ except ImportError:
     sys.exit("openai package not installed. Run: pip install openai")
 
 # ---------------------------------------------------------------------------
-# Prompt (version is derived from the content — changing either string changes PROMPT_VERSION)
+# Prompt — loaded from analysis/prompt-1.txt at import time
 
-SYSTEM_PROMPT = """\
-You are an expert policy analyst classifying public comments submitted to the Virginia Town Hall
-regulatory comment system. You will be given the text of a proposed regulation and a single
-public comment. Return ONLY a JSON object — no other text.
-
-Definitions:
-- stance: the commenter's position on whether the regulation should be adopted.
-  "support" = wants it approved (as-is or with changes);
-  "oppose"  = wants it rejected or substantially weakened;
-  "neutral" = takes no position, asks a question, or provides factual input only;
-  "unknown" = too vague, off-topic, or uninterpretable to classify.
-- tone: the emotional register of the writing, independent of stance.
-  "positive" = affirming, hopeful, appreciative;
-  "negative" = angry, fearful, alarmed, or contemptuous;
-  "neutral"  = matter-of-fact, procedural, or informational;
-  "mixed"    = contains both positive and negative emotional content;
-  "unclear"  = tone cannot be determined (e.g., a one-word comment).
-- stance_confidence: float 0.0–1.0, your confidence in the stance label.
-- stance_rationale: 1–3 sentences explaining the key evidence; quote specific phrases where possible.
-- tags: up to 5 short topic labels relevant to the comment's specific concerns (e.g.
-  "parental rights", "student safety", "privacy", "religious freedom", "LGBTQ+ inclusion",
-  "bullying prevention", "school sports", "bathroom access"). Empty array if none apply.
-
-Return exactly these keys: stance, stance_confidence, stance_rationale, tone, tags.\
-"""
+_PROMPT_FILE = Path(__file__).parent.parent / "prompt-1.txt"
+SYSTEM_PROMPT = _PROMPT_FILE.read_text(encoding="utf-8").strip()
+PROMPT_VERSION = hashlib.sha256(SYSTEM_PROMPT.encode("utf-8")).hexdigest()[:7]
 
 USER_TEMPLATE = """\
 ## Proposed Regulation
@@ -73,15 +51,11 @@ Body:
 Classify this comment per the instructions. Return only JSON.\
 """
 
-PROMPT_VERSION = hashlib.sha256(
-    (SYSTEM_PROMPT + USER_TEMPLATE).encode("utf-8")
-).hexdigest()[:7]
-
 MAX_COMMENT_CHARS = 6000
-_RETRY_DELAYS = [1.0, 2.0]  # delays before attempt 2 and 3
+_RETRY_DELAYS = [1.0, 2.0]
 
 # ---------------------------------------------------------------------------
-# Core functions (importable for tests)
+# Core functions
 
 
 def load_items(path: Path) -> tuple[dict | None, list[dict]]:
@@ -102,11 +76,7 @@ def load_items(path: Path) -> tuple[dict | None, list[dict]]:
 
 
 def build_messages(comment: dict, forum: dict | None) -> tuple[list, bool]:
-    """Build the OpenAI messages list for one comment.
-
-    Returns (messages, truncated) where truncated is True if the comment body
-    was cut to MAX_COMMENT_CHARS.
-    """
+    """Build OpenAI messages for one comment. Returns (messages, truncated)."""
     reg_title = (forum or {}).get("reg_title", "[unknown]")
     reg_desc  = (forum or {}).get("reg_desc",  "[unknown]")
 
@@ -132,8 +102,13 @@ def build_messages(comment: dict, forum: dict | None) -> tuple[list, bool]:
     ], truncated
 
 
+def parse_api_response(content: str) -> dict:
+    data = json.loads(content)
+    keys = ("stance", "stance_confidence", "stance_rationale", "tone", "tags")
+    return {k: data.get(k) for k in keys}
+
+
 def _call_api(client, messages: list, model: str) -> str:
-    """Call the OpenAI chat API with exponential-backoff retry on rate limits."""
     last_exc = None
     for delay in [0.0] + _RETRY_DELAYS:
         if delay:
@@ -151,21 +126,7 @@ def _call_api(client, messages: list, model: str) -> str:
     raise last_exc  # type: ignore[misc]
 
 
-def parse_api_response(content: str) -> dict:
-    """Parse the model's JSON response, returning only the expected keys."""
-    data = json.loads(content)
-    keys = ("stance", "stance_confidence", "stance_rationale", "tone", "tags")
-    return {k: data.get(k) for k in keys}
-
-
-def analyze_comment(
-    client,
-    comment: dict,
-    forum: dict | None,
-    run_id: str,
-    model: str,
-) -> dict:
-    """Analyze one comment and return a fully-formed output record."""
+def analyze_comment(client, comment: dict, forum: dict | None, run_id: str, model: str) -> dict:
     base = {
         "run_id":         run_id,
         "forum_id":       comment.get("forum_id", ""),
@@ -191,7 +152,6 @@ def analyze_comment(
 
 
 def _scrape_ts_from_filename(path: Path) -> str:
-    """Extract the timestamp from a scraped JSONL filename for use in the output name."""
     m = re.search(r"(\d{4}-\d{2}-\d{2}T[\d\-+:]+)", path.stem)
     return m.group(1).replace(":", "-") if m else "unknown"
 
@@ -199,13 +159,11 @@ def _scrape_ts_from_filename(path: Path) -> str:
 # ---------------------------------------------------------------------------
 # CLI
 
-
 def main() -> None:
     load_dotenv()
 
     parser = argparse.ArgumentParser(
-        description="Analyze VA Townhall public comments with GPT-4o.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="Analyze VA Townhall public comments with GPT-4o (synchronous).",
     )
     parser.add_argument("input", help="Path to scraped JSONL file")
     parser.add_argument(
@@ -215,11 +173,7 @@ def main() -> None:
         metavar="{5,10,20,50}",
         help="Process only the first N comments (for testing). Omit to process all.",
     )
-    parser.add_argument(
-        "--model",
-        default="gpt-4o",
-        help="OpenAI model name (default: gpt-4o)",
-    )
+    parser.add_argument("--model", default="gpt-4o", help="OpenAI model (default: gpt-4o)")
     args = parser.parse_args()
 
     api_key = os.environ.get("OPENAI_API_KEY")
@@ -234,10 +188,7 @@ def main() -> None:
     forum, comments = load_items(input_path)
 
     if forum is None:
-        print(
-            "Warning: no ForumItem found in file — regulation context will be [unknown].",
-            file=sys.stderr,
-        )
+        print("Warning: no ForumItem found — regulation context will be [unknown].", file=sys.stderr)
 
     if args.limit:
         comments = comments[: args.limit]
@@ -264,16 +215,10 @@ def main() -> None:
             out.flush()
             if record["error"]:
                 n_err += 1
-                print(
-                    f"  [{i}/{total}] ERROR {comment.get('comment_id')}: {record['error']}",
-                    file=sys.stderr,
-                )
+                print(f"  [{i}/{total}] ERROR {comment.get('comment_id')}: {record['error']}", file=sys.stderr)
             else:
                 n_ok += 1
-                print(
-                    f"  [{i}/{total}] OK    {comment.get('comment_id')} → {record['stance']}",
-                    file=sys.stderr,
-                )
+                print(f"  [{i}/{total}] OK    {comment.get('comment_id')} → {record['stance']}", file=sys.stderr)
             time.sleep(0.1)
 
     print(f"\nDone. {n_ok} ok, {n_err} errors → {out_path}", file=sys.stderr)
