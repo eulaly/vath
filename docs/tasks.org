@@ -1,5 +1,8 @@
-* [ ] t1.1: scrape one forum (1)
+* [X] t1.1: scrape one forum (1)
 Use https://www.townhall.virginia.gov/L/comments.cfm?GDocForumID=452 as the first forum. Scraper should be run manually at this step.
+ViewComments (townhall.virginia.gov/L/ViewComments.cfm?CommentID=#) appears to be raw list of all comments on forum - could be useful later for whole-scrape
+Append forum id to viewall per forum (townhall.virginia.gov/L/ViewComments.cfm?GdocForumID=452)
+Comments are hydrated in backend via js-cued button (AJAX?)
 ** acceptance criteria
 1. run manual scraper
    1. store proposal title and description
@@ -10,9 +13,9 @@ Use https://www.townhall.virginia.gov/L/comments.cfm?GDocForumID=452 as the firs
 ** notes
 
 ** evidence
-- commit: 
-- tests: 
-- datetime: 
+- commit: (see below)
+- tests: 7 passing (pytest tests/)
+- datetime: 2026-05-05 12:26
 
 * [ ] t1.2: initial analysis pipeline
 Write a simple pipeline for both - prefer non-concurrent/async from scraping run. Should be run manually, separate from scraper. You may use scrapy, but are not required to.

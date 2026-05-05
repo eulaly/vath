@@ -22,5 +22,9 @@ env/
 archive/
 
 
+# --- scrapy ---
+.scrapy/
+output/
+
 # --- misc ---
 .DS_Store

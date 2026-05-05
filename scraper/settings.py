@@ -15,8 +15,7 @@ NEWSPIDER_MODULE = "scraper.spiders"
 ADDONS = {}
 
 
-# Crawl responsibly by identifying yourself (and your website) on the user-agent
-#USER_AGENT = "scraper (+http://www.yourdomain.com)"
+USER_AGENT = "vath-research-scraper/1.0 (public comment analysis; contact: research)"
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = True
@@ -75,13 +74,24 @@ DOWNLOAD_DELAY = 1
 # Enable showing throttling stats for every response received:
 #AUTOTHROTTLE_DEBUG = False
 
-# Enable and configure HTTP caching (disabled by default)
-# See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html#httpcache-middleware-settings
-#HTTPCACHE_ENABLED = True
-#HTTPCACHE_EXPIRATION_SECS = 0
-#HTTPCACHE_DIR = "httpcache"
-#HTTPCACHE_IGNORE_HTTP_CODES = []
-#HTTPCACHE_STORAGE = "scrapy.extensions.httpcache.FilesystemCacheStorage"
+# HTTP cache — enabled during development to avoid re-hitting the server on test runs.
+# Disable (or delete httpcache/) before a production run.
+HTTPCACHE_ENABLED = True
+HTTPCACHE_EXPIRATION_SECS = 86400  # 24 h
+HTTPCACHE_DIR = "httpcache"
+
+# Output
+FEEDS = {
+    "output/%(name)s_%(time)s.jsonl": {
+        "format": "jsonlines",
+        "encoding": "utf-8",
+        "overwrite": False,
+    }
+}
+
+# The site declares windows-1251 in a meta tag but sends valid UTF-8 bytes.
+# Force UTF-8 to prevent lxml from re-decoding via the meta charset.
+DEFAULT_RESPONSE_ENCODING = "utf-8"
 
 # Set settings whose default value is deprecated to a future-proof value
 FEED_EXPORT_ENCODING = "utf-8"
