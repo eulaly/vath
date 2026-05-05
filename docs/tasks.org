@@ -27,18 +27,33 @@ Comments are hydrated in backend via js-cued button (AJAX?).
 - Date parsing: _parse_date() normalizes whitespace, upper-cases, parses "%m/%d/%y %I:%M %p" → ISO 8601; falls back to raw string on failure.
 
 ** evidence
-- commit: beb5cf4 (AC1-2), <commit> (AC3-6)
+- commit: beb5cf4 (AC1-2), e7df0b2 (AC3-6)
 - tests: 8 passing (`python -m pytest tests -q`) or (`python -m pytest tests/`)
    - `scrapy crawl forum -a forum_id=452 -s LOG_LEVEL=WARNING 2>&1`
    - retrieved 9083 comments
 - datetime: 2026-05-05
 
-* [ ] t1.2: initial analysis pipeline
-Write a simple pipeline for both - prefer non-concurrent/async from scraping run. Should be run manually, separate from scraper. You may use scrapy, but are not required to.
+* [ ] t1.2: initial 4o sentiment
+Write a simple manual pipeline for gpt-4o that reads one scraped forum jsonl file and roduces a separate analyzed jsonl file. this step must not mutate scraper output. analysis should classify each comment for regulatory stance, generic tone/sentiment, confidence, and enough rationale/evidence to support later dashboard drilldown.
+Should be run manually, separate from scraper. You may use scrapy, but are not required to.
+- Sentiment is derived, not scraped - keep separate from raw comments.
+- keep jsonl as interchange/audit format
+  
 ** acceptance criteria
-1. run manual sentiment analysis of selected file against haiku
-2. run manual sentiment analysis of selected file against gpt-4o
-
+1. input scraped jsonl doc by filename/path, e.g. "./output/forum452_comments_<datetime>.jsonl"
+   - handle mixed itemtypes, e.g., forum + comment items
+2. output new analysis file, e.g., "analysis/forum452_<datetime>_<model>_<datetime>.jsonl"
+   - one analysis record per comment
+   - include run_id, forum_id, comment_id, analyzed_at, model, prompt_version
+3. capture stance toward proposed reg/guidance:
+   - `stance`: support, oppose, neutral, unknown
+   - `confidence`: 0-1
+   - short rationale, if provided by model
+4. capture generic sentiment/tone separately from stance: `tone`=positive, negative, neutral, mixed, unclear
+5. capture issue/topic tags for later grouping, may be empty
+6. use .env for api key management
+7. document the exact prompt version used; prompt text may live in code or docs, but must have a version string/hash in output records
+   
 ** notes
 
 ** evidence
