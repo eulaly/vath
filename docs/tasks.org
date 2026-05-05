@@ -13,7 +13,7 @@ Comments are hydrated in backend via js-cued button (AJAX?)
 ** notes
 
 ** evidence
-- commit: (see below)
+- commit: beb5cf4
 - tests: 7 passing (pytest tests/)
 - datetime: 2026-05-05 12:26
 
