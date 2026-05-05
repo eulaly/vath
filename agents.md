@@ -38,3 +38,8 @@ Description and PM notes
 - tests: 
 - date: [2026-05-05 Tue 15:00]
 ```
+
+## tests and commands
+- project dir: `%userprofile%\projects\vath\`
+- python venv: `%userprofile%\projects\vath\venv\scripts\activate`
+- pytest (inside venv): `python -m pytest tests/`
