@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
-analysis/gpt4o/analysis-batch.py — OpenAI Batch API pipeline
+analysis_batch.py — OpenAI Batch API pipeline
 
 Commands (run manually in order):
-    submit   <input_jsonl> [--model gpt-4o]   — build request file, upload, create batch
-    status   <run_id>                          — check batch status, update manifest
-    download <run_id>                          — download + normalize output, update manifest
+    submit   <input_jsonl> [--model gpt-4o] [--limit N]
+                                           — build request file, upload, create batch
+    status   [run_id]                      — check batch status, update manifest
+    download [run_id]                      — download + normalize output, update manifest
+
+run_id defaults to the most recent run in runs/ when omitted.
 
 File layout (all under analysis/gpt4o/):
     requests/<run_id>.jsonl     — batch input sent to OpenAI
@@ -28,6 +31,79 @@ try:
     import openai
 except ImportError:
     sys.exit("openai package not installed. Run: pip install openai")
+
+# ---------------------------------------------------------------------------
+# Model limits and token estimation
+
+# Max enqueued tokens across ALL concurrent batches for this model
+# (docs/openai.md pricing table, updated 2026-05-05).
+# NOTE: your org tier may be lower — if a submit fails, use --limit to reduce chunk size.
+MODEL_LIMITS: dict[str, int] = {
+    "gpt-5.5":        900_000,
+    "gpt-5.4":        900_000,
+    "gpt-5.4-mini": 2_000_000,
+    "gpt-5.4-nano":   200_000,
+    "gpt-4o":         900_000,
+    "gpt-4o-mini":  2_000_000,
+    "gpt-o4-mini":  2_000_000,
+}
+_DEFAULT_TOKEN_LIMIT = 900_000
+
+# tiktoken encoding per model family; unknown models fall back to o200k_base
+_MODEL_ENCODING: dict[str, str] = {
+    "gpt-5.5":       "o200k_base",
+    "gpt-5.4":       "o200k_base",
+    "gpt-5.4-mini":  "o200k_base",
+    "gpt-5.4-nano":  "o200k_base",
+    "gpt-4o":        "o200k_base",
+    "gpt-4o-mini":   "o200k_base",
+    "gpt-o4-mini":   "o200k_base",
+}
+# Leave 10% headroom below the published limit
+_LIMIT_BUFFER = 0.90
+
+
+def estimate_tokens(messages: list[dict], model: str) -> int:
+    """Estimate token count for a messages list.
+
+    Uses tiktoken when available (exact for OpenAI models); falls back to
+    chars/3 + 4-token overhead per message for unknown/Anthropic models.
+    """
+    try:
+        import tiktoken
+        enc = tiktoken.get_encoding(_MODEL_ENCODING.get(model, "o200k_base"))
+        return sum(4 + len(enc.encode(m["content"])) for m in messages)
+    except ImportError:
+        return sum(4 + len(m["content"]) // 3 for m in messages)
+
+
+def chunk_comments_by_tokens(
+    comments: list[dict], forum: dict | None, model: str
+) -> list[list[dict]]:
+    """Split comments into chunks where each chunk fits under the model token limit."""
+    raw_limit = MODEL_LIMITS.get(model, _DEFAULT_TOKEN_LIMIT)
+    token_limit = int(raw_limit * _LIMIT_BUFFER)
+
+    chunks: list[list[dict]] = []
+    current: list[dict] = []
+    current_tokens = 0
+
+    for comment in comments:
+        messages, _ = build_messages(comment, forum)
+        tokens = estimate_tokens(messages, model)
+        if current and current_tokens + tokens > token_limit:
+            chunks.append(current)
+            current = [comment]
+            current_tokens = tokens
+        else:
+            current.append(comment)
+            current_tokens += tokens
+
+    if current:
+        chunks.append(current)
+
+    return chunks
+
 
 # ---------------------------------------------------------------------------
 # Prompt
@@ -221,6 +297,15 @@ def make_manifest(
     }
 
 
+def _latest_run_id() -> str:
+    """Return the run_id of the most recently saved manifest, or exit if none found."""
+    runs = list(RUNS_DIR.glob("*.json")) if RUNS_DIR.exists() else []
+    if not runs:
+        sys.exit(f"No runs found in {RUNS_DIR}. Submit a batch first.")
+    latest = max(runs, key=lambda p: p.stat().st_mtime)
+    return latest.stem
+
+
 def load_manifest(run_id: str) -> dict:
     path = RUNS_DIR / f"{run_id}.json"
     return json.loads(path.read_text(encoding="utf-8"))
@@ -234,6 +319,55 @@ def save_manifest(manifest: dict) -> None:
 
 # ---------------------------------------------------------------------------
 # Subcommand: submit
+
+def _submit_chunk(
+    chunk: list[dict],
+    forum: dict | None,
+    input_path: Path,
+    input_sha256: str,
+    model: str,
+    client,
+    chunk_index: int,
+    total_chunks: int,
+) -> str:
+    """Upload and submit one chunk of comments. Returns the run_id."""
+    import uuid
+    run_id = str(uuid.uuid4())
+    label = f"chunk {chunk_index + 1}/{total_chunks}" if total_chunks > 1 else "single batch"
+
+    REQUESTS_DIR.mkdir(parents=True, exist_ok=True)
+    request_path = REQUESTS_DIR / f"{run_id}.jsonl"
+    with open(request_path, "w", encoding="utf-8") as f:
+        for comment in chunk:
+            line = build_batch_request_line(comment, forum, model)
+            f.write(json.dumps(line, ensure_ascii=False) + "\n")
+
+    print(f"[{label}] Wrote {len(chunk)} requests → {request_path}", file=sys.stderr)
+
+    with open(request_path, "rb") as f:
+        uploaded = client.files.create(file=f, purpose="batch")
+    print(f"[{label}] Uploaded: {uploaded.id}", file=sys.stderr)
+
+    batch = client.batches.create(
+        input_file_id=uploaded.id,
+        endpoint="/v1/chat/completions",
+        completion_window="24h",
+        metadata={"run_id": run_id, "input_filename": str(input_path)},
+    )
+    print(f"[{label}] Batch created: {batch.id}  status={batch.status}", file=sys.stderr)
+
+    manifest = make_manifest(
+        run_id=run_id,
+        input_filename=str(input_path),
+        input_sha256=input_sha256,
+        model=model,
+        batch_id=batch.id,
+        records_submitted=len(chunk),
+        request_filename=str(request_path),
+    )
+    save_manifest(manifest)
+    return run_id
+
 
 def cmd_submit(args, client) -> None:
     _load_prompt(Path(args.prompt))
@@ -250,49 +384,39 @@ def cmd_submit(args, client) -> None:
     if forum is None:
         print("Warning: no ForumItem found — regulation context will be [unknown].", file=sys.stderr)
 
-    import uuid
-    run_id = str(uuid.uuid4())
+    if args.limit:
+        comments = comments[:args.limit]
+        print(f"Limiting to {len(comments)} comments (--limit {args.limit}).", file=sys.stderr)
+
+    token_limit = int(MODEL_LIMITS.get(args.model, _DEFAULT_TOKEN_LIMIT) * _LIMIT_BUFFER)
+    chunks = chunk_comments_by_tokens(comments, forum, args.model)
+    total = len(chunks)
+    print(
+        f"Model: {args.model}  token limit: {token_limit:,}  "
+        f"→ {len(comments)} comments split into {total} chunk(s).",
+        file=sys.stderr,
+    )
+
     input_sha256 = hashlib.sha256(input_path.read_bytes()).hexdigest()
 
-    # Build batch request file
-    REQUESTS_DIR.mkdir(parents=True, exist_ok=True)
-    request_path = REQUESTS_DIR / f"{run_id}.jsonl"
-    with open(request_path, "w", encoding="utf-8") as f:
-        for comment in comments:
-            line = build_batch_request_line(comment, forum, args.model)
-            f.write(json.dumps(line, ensure_ascii=False) + "\n")
+    # Submit only the first chunk — the enqueued token limit is a TOTAL across all
+    # concurrent batches, so stacking multiple submissions will exceed the quota.
+    # Wait for each batch to complete before submitting the next.
+    run_id = _submit_chunk(chunks[0], forum, input_path, input_sha256, args.model, client, 0, total)
 
-    print(f"Wrote {len(comments)} requests → {request_path}", file=sys.stderr)
+    print(f"\nBatch 1/{total} submitted.", file=sys.stderr)
+    print(f"  status:   python analysis/gpt4o/analysis_batch.py status {run_id}", file=sys.stderr)
+    print(f"  download: python analysis/gpt4o/analysis_batch.py download {run_id}", file=sys.stderr)
 
-    # Upload to OpenAI
-    print("Uploading request file ...", file=sys.stderr)
-    with open(request_path, "rb") as f:
-        uploaded = client.files.create(file=f, purpose="batch")
-    print(f"Uploaded: {uploaded.id}", file=sys.stderr)
+    if total > 1:
+        remaining = sum(len(c) for c in chunks[1:])
+        print(f"\n{total - 1} more chunk(s) remaining ({remaining} comments).", file=sys.stderr)
+        print("After this batch completes and is downloaded, rerun submit with --limit to get the next chunk:", file=sys.stderr)
+        offset = len(chunks[0])
+        for idx, chunk in enumerate(chunks[1:], start=2):
+            print(f"  chunk {idx}/{total}: comments {offset}–{offset + len(chunk) - 1}", file=sys.stderr)
+            offset += len(chunk)
 
-    # Create batch
-    batch = client.batches.create(
-        input_file_id=uploaded.id,
-        endpoint="/v1/chat/completions",
-        completion_window="24h",
-        metadata={"run_id": run_id, "input_filename": str(input_path)},
-    )
-    print(f"Batch created: {batch.id}  status={batch.status}", file=sys.stderr)
-
-    # Save manifest
-    manifest = make_manifest(
-        run_id=run_id,
-        input_filename=str(input_path),
-        input_sha256=input_sha256,
-        model=args.model,
-        batch_id=batch.id,
-        records_submitted=len(comments),
-        request_filename=str(request_path),
-    )
-    save_manifest(manifest)
-
-    print(f"\nrun_id: {run_id}", file=sys.stderr)
-    print(f"Check status:   python analysis/gpt4o/analysis-batch.py status {run_id}", file=sys.stderr)
     print(run_id)  # stdout for scripting
 
 
@@ -300,7 +424,10 @@ def cmd_submit(args, client) -> None:
 # Subcommand: status
 
 def cmd_status(args, client) -> None:
-    manifest = load_manifest(args.run_id)
+    run_id = args.run_id or _latest_run_id()
+    if not args.run_id:
+        print(f"(using latest run: {run_id})", file=sys.stderr)
+    manifest = load_manifest(run_id)
     batch = client.batches.retrieve(manifest["batch_id"])
 
     counts = batch.request_counts
@@ -314,14 +441,17 @@ def cmd_status(args, client) -> None:
 
     if batch.status == "completed":
         print(f"\nReady to download. Run:")
-        print(f"  python analysis/gpt4o/analysis-batch.py download {args.run_id}")
+        print(f"  python analysis/gpt4o/analysis_batch.py download {run_id}")
 
 
 # ---------------------------------------------------------------------------
 # Subcommand: download
 
 def cmd_download(args, client) -> None:
-    manifest = load_manifest(args.run_id)
+    run_id = args.run_id or _latest_run_id()
+    if not args.run_id:
+        print(f"(using latest run: {run_id})", file=sys.stderr)
+    manifest = load_manifest(run_id)
     batch = client.batches.retrieve(manifest["batch_id"])
 
     if batch.status != "completed":
@@ -398,12 +528,18 @@ def main() -> None:
         default=str(_DEFAULT_PROMPT_FILE),
         help="Path to system prompt file (default: analysis/prompt-1.txt)",
     )
+    p_submit.add_argument(
+        "--limit", type=int, default=None, metavar="N",
+        help="Submit only the first N comments (useful for staying under token quota)",
+    )
 
     p_status = sub.add_parser("status", help="Check batch status")
-    p_status.add_argument("run_id", help="run_id from submit output")
+    p_status.add_argument("run_id", nargs="?", default=None,
+                          help="run_id from submit (default: most recent run)")
 
     p_download = sub.add_parser("download", help="Download and normalize completed batch")
-    p_download.add_argument("run_id", help="run_id from submit output")
+    p_download.add_argument("run_id", nargs="?", default=None,
+                            help="run_id from submit (default: most recent run)")
 
     args = parser.parse_args()
     client = openai.OpenAI(api_key=api_key)

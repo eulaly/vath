@@ -104,7 +104,7 @@ Reference: ./docs/openai-batch.md. openai batch output order is not guaranteed, 
 - tests: 18 passing (pytest tests/analysis_gpt4o_batch.py), 46 total across suite
 - datetime: [2026-05-05 Tue 17:00]
 
-* [ ] t1.2.2: Tokenizer / Batch mgmt
+* [X] t1.2.2: Tokenizer / Batch mgmt
 openai batch analysis requires coordination - more like a job queue.
 batch script should setup queue for user to setup manually; openai api will reject subsequent batches when the total daily token limit is maxed.
 ** Acceptance Criteria
@@ -117,17 +117,136 @@ batch script should setup queue for user to setup manually; openai api will reje
    - Each chunk becomes its own batch submission with its own run_id.
    - Drop --limit (or keep as hard cap override).
    - Print all run_ids
-   - Submit the first batch only
+   - Submit the first batch only (failed)
 4. Update test script to show tokenizer output
 
 ** notes
+- MODEL_LIMITS and _MODEL_ENCODING dicts in analysis/gpt4o/analysis_batch.py; keyed by model name, sourced from docs/openai.md. Unknown models fall back to o200k_base encoding and 900k token limit.
+- estimate_tokens(messages, model): uses tiktoken (o200k_base) when available; falls back to chars/3 + 4 overhead per message.
+- chunk_comments_by_tokens(comments, forum, model): greedy bin-pack; respects 10% headroom (_LIMIT_BUFFER=0.90). Returns list of comment lists.
+- submit sends only chunks[0] — enqueued token limit is a TOTAL across all concurrent batches; stacking would exceed quota. Remaining chunk ranges are printed as manual instructions.
+- --limit N still available as a hard cap on total comments before chunking (useful when org-tier limit is below the published model limit).
+- pip install tiktoken required for exact token counting; chars/3 fallback activates automatically if not installed.
+
+  
+*** usage
+- `pip install tiktoken`
+- submit first chunk (auto-sized to model token limit, uses most recent output file)
+  `python analysis/gpt4o/analysis_batch.py submit output/f452.jsonl --model gpt-4o-mini`
+- check status (defaults to most recent run)
+  `python analysis/gpt4o/analysis_batch.py status`
+- download + normalize when complete
+  `python analysis/gpt4o/analysis_batch.py download`
+- submit next chunk: rerun with `--limit` to cover the next N comments
+  (track which comment_ids have already been analyzed to avoid duplicates)
+
+*** validation
+#+begin_src python
+import pandas as pd
+df_input = pd.read_json('C:/Users/moses/projects/vath/analysis/gpt4o/runs/75ee9a/f452.jsonl', lines=True)
+# drop forum item
+df_input_comments = df_input[df_input["comment_id"].notna()].copy()
+df_output = pd.read_json('C:/Users/moses/projects/vath/analysis/gpt4o/runs/75ee9a/75ee9a6c-8fc2-4924-8d96-b55bb4d5e832_gpt-4o.jsonl', lines=True)
+dfm = df_output.merge(df_input_comments,on="comment_id",how="left",suffixes=("","_input"),)
+dfm.to_csv('C:/Users/moses/projects/vath/analysis/gpt4o/1.csv')
+#+end_src
+order columns:
+forum_id_input,comment_id,title,text,date,author,stance,stance_confidence,stance_rationale,tone,tags,error,truncated,analyzed_at,prompt_version,model
+
+** evidence
+- commit:
+- tests: 23 passing (pytest tests/analysis_gpt4o_batch.py), 51 total across suite
+- datetime: [2026-05-06 Wed 08:55]
+
+* [ ] t1.2.3: batch job refactor
+This task encompasses intent and fixes for 1.2.1 and 1.2.2.
+batch processing should  be a resumable job queue, not a one-shot script. the user should not need to remember offsets, completed chunks, failed batches, or which comments remain.
+** Acceptance Criteria
+1. create tokenizer to prepare the batch job
+   - input: prompt.txt, forum.jsonl
+   - output: report.json with each model's batch structure, cost, and time (considering tpd constraints)
+     - analysis_batch should be able to take this report to run the job. good place to copy the raw scraper jsonl
+     #+begin_src python
+       {'prompt': 'prompt1.txt',
+        'input_file': 'f451.jsonl',
+        'input_tokens': 123456789,
+        'gpt-4o': {'jobs':71,'cost_$':4,'est_queue_days':3} # divide tokens by model TPD to get time_days
+        'gpt-4o-mini': {'jobs':71,'cost_$':4,'est_queue_days':3} # divide tokens by model TPD to get time_days
+     #+end_src
+2. batch py should contain commands to create, check, run, and complete jobs.
+   - inputs: report.json, --model, optional --job N, read api key from .env
+   - outputs:
+     - status.json: job structure, status, metadata; updated when jobs are finished. includes all report.json info
+     - for each job: jobN-input.jsonl (what is sent to openai); jobN-output-raw.jsonl, jobN-output.jsonl, and jobN-errors.jsonl (when downloaded)       
+     - jobN-output.jsonl contains:
+       - one analysis record per comment
+       - `run_id`, `forum_id`, `comment_id`, `analyzed_at`, `model`, `prompt_version`
+       - `stance` toward proposed reg/guidance: support|oppose|neutral|unclear
+       - `stance_confidence`: 0-1
+       - short rationale, if provided by model
+       - generic sentiment `tone` (separate from stance): positive|negative|neutral|mixed|unclear
+       - `tags` for later grouping, may be empty
+   - commands: `create`, `submit`, `status`, `download`
+     - `create` run directory, copy input/prompt/report, generate status.json, job request files
+     - `submit` if eligible, submit next or specified job; does not blindly stack jobs, warns if prev jobs in progress, print next action
+     - `status` check status of one or all submitted jobs, update status.json
+     - `download` raw output (jobN-output-raw.jsonl) and error files for completed jobs, and normalize raw output (jobN-output.jsonl) auto run status.
+3. tests without live api calls
+   - partial completed run
+   - failed batch records
+   - out-of-order output
+   - duplicate custom_id
+   - missing output file
+   - resume from status.json
+   - remaining-comment detection
+
+* === Backlog ===
+* [ ] X: analysis validation view
+create a lightweight validation script that joins raw comments to normalized analysis output and writes a human-reviewable csv.
+
+** acceptance criteria
+1. input raw scrape jsonl and all *-output.jsonl files in a dir
+2. join by comment_id, not dataframe index
+3. output csv columns in review order:
+   - forum_id, comment_id, title, text, date, author
+   - stance, stance_confidence, stance_rationale, tone, tags
+   - error, truncated, analyzed_at, prompt_version, model
+4. print validation counts
+   - raw comments
+   - analyzed records
+   - joined records
+   - missing comment text
+   - duplicate comment_ids
+   - error records
+   - stance counts
+   - tone counts
+5. tests cover join behavior and missing/duplicate ids
 
 ** evidence
 - commit:
 - tests:
-- datetime:   
+- csv:
+- datetime:       
+* [ ] X: text encoding cleanup
+fix mojibake in scraped text before analysis/reporting, especially curly quotes showing as â€™.
 
-   
+** acceptance criteria
+1. identify whether mojibake exists in raw scrape, analysis output, or csv export only
+2. add repair step at the earliest correct layer
+3. preserve original raw scrape if repair changes source text
+4. add test cases for common bad sequences:
+   - â€™
+   - â€œ
+   - â€
+   - â€“
+   - â€”
+5. document whether repaired text is used for model input
+
+** evidence
+- commit:
+- tests:
+- before/after sample:
+- datetime:
 * [ ] X: complete proposal information
 Ensure we capture as much useful information as possible about the actual proposal - contact information, etc. what the state actually says about what was posted. 
 ** acceptance criteria

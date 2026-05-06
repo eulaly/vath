@@ -250,3 +250,62 @@ def test_manifest_save_load_roundtrip(tmp_path, monkeypatch):
     bt.save_manifest(m)
     loaded = bt.load_manifest(RUN_ID)
     assert loaded == m
+
+
+# ---------------------------------------------------------------------------
+# estimate_tokens
+
+def test_estimate_tokens_returns_positive_int():
+    messages = [{"role": "system", "content": "hello"}, {"role": "user", "content": "world"}]
+    result = bt.estimate_tokens(messages, "gpt-4o-mini")
+    assert isinstance(result, int)
+    assert result > 0
+
+
+def test_estimate_tokens_longer_content_is_larger():
+    short_msg = [{"role": "user", "content": "hi"}]
+    long_msg  = [{"role": "user", "content": "hi " * 500}]
+    assert bt.estimate_tokens(long_msg, "gpt-4o-mini") > bt.estimate_tokens(short_msg, "gpt-4o-mini")
+
+
+def test_estimate_tokens_fallback_without_tiktoken(monkeypatch):
+    import sys as _sys
+    monkeypatch.setitem(_sys.modules, "tiktoken", None)
+    messages = [{"role": "user", "content": "x" * 300}]
+    result = bt.estimate_tokens(messages, "gpt-4o")
+    assert result == 4 + 300 // 3
+
+
+# ---------------------------------------------------------------------------
+# chunk_comments_by_tokens
+
+def test_chunk_single_chunk_for_small_input(monkeypatch):
+    monkeypatch.setattr(bt, "MODEL_LIMITS", {"gpt-4o-mini": 10_000_000})
+    comments = [COMMENT_ITEM, {**COMMENT_ITEM, "comment_id": "99999"}]
+    chunks = bt.chunk_comments_by_tokens(comments, FORUM_ITEM, "gpt-4o-mini")
+    assert len(chunks) == 1
+    assert len(chunks[0]) == 2
+
+
+def test_chunk_splits_when_over_limit(monkeypatch):
+    monkeypatch.setattr(bt, "MODEL_LIMITS", {"gpt-4o-mini": 1})
+    comments = [
+        COMMENT_ITEM,
+        {**COMMENT_ITEM, "comment_id": "99999"},
+        {**COMMENT_ITEM, "comment_id": "88888"},
+    ]
+    chunks = bt.chunk_comments_by_tokens(comments, FORUM_ITEM, "gpt-4o-mini")
+    assert len(chunks) == len(comments)
+
+
+def test_chunk_preserves_all_comments(monkeypatch):
+    monkeypatch.setattr(bt, "MODEL_LIMITS", {"gpt-4o-mini": 200})
+    comments = [{**COMMENT_ITEM, "comment_id": str(i)} for i in range(10)]
+    chunks = bt.chunk_comments_by_tokens(comments, FORUM_ITEM, "gpt-4o-mini")
+    flat = [c for chunk in chunks for c in chunk]
+    assert len(flat) == 10
+
+
+def test_model_limits_has_required_models():
+    for model in ("gpt-4o", "gpt-4o-mini", "gpt-5.4", "gpt-5.4-mini", "gpt-o4-mini"):
+        assert model in bt.MODEL_LIMITS, f"{model} missing from MODEL_LIMITS"
