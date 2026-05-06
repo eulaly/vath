@@ -382,3 +382,23 @@ Expired requests will be written to your error file with the message as shown be
 {"id": "batch_req_123", "custom_id": "request-3", "response": null, "error": {"code": "batch_expired", "message": "This request could not be executed before the completion window expired."}}
 {"id": "batch_req_123", "custom_id": "request-7", "response": null, "error": {"code": "batch_expired", "message": "This request could not be executed before the completion window expired."}}
 ```
+
+
+# Pricing and Limits - Batch
+Updated 2026-05-05
+
+Price per 1M Tokens, Short Context / Limits
+TPM = Tokens per minute
+Req/rpm = Requests per minute
+TPD = Tokens per /day/, you cannot queue more than this TOTAL across all concurrent batches
+| Model        | Input ($) | Cached Input ($) | Output ($) | Token  (tpm) | Req (rpm) | Batch (tpd) |
+|--------------|-----------|------------------|------------|--------------|-----------|-------------|
+| gpt-5.5      | 2.5       | 0.25             | 15.00      | 500000       | 500       | 900000      |
+| gpt-5.4      | 1.25      | 0.13             | 7.50       | 500000       | 500       | 900000      |
+| gpt-5.4-mini | 0.375     | 0.0375           | 2.25       | 200000       | 500       | 2000000     |
+| gpt-5.4-nano | 0.10      | 0.01             | 0.625      | 200000       | 500       | 200000      |
+| gpt-4o       | 1.25      | -                | 5.00       | 500000       | 500       | 900000      |
+| gpt-4o-mini  | 0.075     | -                | 0.30       | 200000       | 500       | 2000000     |
+| gpt-o4-mini  | 0.55      | -                | 0.30       | 200000       | 500       | 2000000     |
+https://developers.openai.com/api/docs/pricing?latest-pricing=batch
+https://platform.openai.com/settings/organization/limits

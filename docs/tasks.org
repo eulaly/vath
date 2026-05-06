@@ -77,7 +77,7 @@ Should be run manually, separate from scraper. You may use scrapy, but are not r
   - see: ./analysis/gpt4o/forum452_unknown_gpt-4o_2026-05-05T18-48-32+00-00.jsonl
 - date: [2026-05-05 Tue 15:00]
 
-* [ ] t1.2.1: batch processing
+* [X] t1.2.1: batch processing
 Create analysis-batch.py to capture same elements as t1.2 above. 
 May need to add multiple commands to upload, check batch status, download, etc.
 Commands should all be run manually.
@@ -98,13 +98,36 @@ Reference: ./docs/openai-batch.md. openai batch output order is not guaranteed, 
 - custom_id format: comment_{comment_id} — unique within a forum, stable across runs.
 - PROMPT_VERSION derived from analysis/prompt-1.txt (same file as realtime); both scripts produce matching prompt_hash in all records.
 - analysis/prompt-1.txt: system prompt as plaintext, read at import time by both scripts. Edit here to change prompt for both pipelines.
-- Tests use importlib.util to load hyphenated filenames; monkeypatch for RUNS_DIR in save/load test.
 
 ** evidence
-- commit:
+- commit: 683bfb3 (remove hyphen), f3abbef
 - tests: 18 passing (pytest tests/analysis_gpt4o_batch.py), 46 total across suite
 - datetime: [2026-05-05 Tue 17:00]
 
+* [ ] t1.2.2: Tokenizer / Batch mgmt
+openai batch analysis requires coordination - more like a job queue.
+batch script should setup queue for user to setup manually; openai api will reject subsequent batches when the total daily token limit is maxed.
+** Acceptance Criteria
+1. add token estimator utility script, probably to /analysis
+2. add MODEL_LIMITS dict to analysis_batch.py. if there are more than (n)
+   - gpt-4o (30k tpm/90k tpd batch)
+   - gpt-4o-mini (200k tpm/2M tpd batch)
+   - add models listed in docs/openai.md
+3. Auto-chunk submit: before writing the request file, walk comments, accumulate estimated tokens, and split into chunks that fit under the model's limit.
+   - Each chunk becomes its own batch submission with its own run_id.
+   - Drop --limit (or keep as hard cap override).
+   - Print all run_ids
+   - Submit the first batch only
+4. Update test script to show tokenizer output
+
+** notes
+
+** evidence
+- commit:
+- tests:
+- datetime:   
+
+   
 * [ ] X: complete proposal information
 Ensure we capture as much useful information as possible about the actual proposal - contact information, etc. what the state actually says about what was posted. 
 ** acceptance criteria
