@@ -75,9 +75,24 @@ ANALYZED_AT = "2026-05-05T18:00:00+00:00"
 RUN_ID = "test-run-id-123"
 MODEL = "gpt-4o"
 
+# Minimal status.json for testing job logic
+def _make_status(jobs_override=None):
+    jobs = jobs_override or [
+        {"job_num": 1, "run_id": "r1", "status": "pending", "batch_id": None,
+         "records_submitted": 60, "records_completed": None, "records_failed": None,
+         "submitted_at": None, "completed_at": None},
+    ]
+    return {
+        "model": "gpt-4o-mini", "prompt_hash": "abc1234",
+        "input_file": "output/f452.jsonl", "input_sha256": "sha",
+        "total_comments": 100, "input_tokens": 50_000,
+        "est_queue_days": 0.025, "cost_$": 0.01,
+        "total_jobs": len(jobs), "jobs": jobs,
+    }
+
 
 # ---------------------------------------------------------------------------
-# Prompt versioning (batch reads the same prompt file)
+# Prompt versioning
 
 def test_prompt_version_is_7_hex_chars():
     assert len(bt.PROMPT_VERSION) == 7
@@ -207,52 +222,6 @@ def test_normalize_unknown_comment_id():
 
 
 # ---------------------------------------------------------------------------
-# Manifest
-
-def test_make_manifest_all_keys():
-    m = bt.make_manifest(
-        run_id=RUN_ID,
-        input_filename="output/forum452.jsonl",
-        input_sha256="abc123",
-        model="gpt-4o",
-        batch_id="batch_xyz",
-        records_submitted=100,
-        request_filename="analysis/gpt4o/requests/test-run-id-123.jsonl",
-    )
-    required = {
-        "run_id", "input_filename", "input_sha256", "prompt_hash", "model",
-        "batch_id", "records_submitted", "records_completed", "records_failed",
-        "request_filename", "raw_output_filename", "normalized_output_filename",
-        "created_at", "completed_at",
-    }
-    assert required == set(m.keys())
-
-
-def test_make_manifest_initial_nulls():
-    m = bt.make_manifest(
-        run_id=RUN_ID, input_filename="f", input_sha256="s",
-        model="gpt-4o", batch_id="b", records_submitted=10, request_filename="r",
-    )
-    assert m["records_completed"] is None
-    assert m["records_failed"] is None
-    assert m["raw_output_filename"] is None
-    assert m["normalized_output_filename"] is None
-    assert m["completed_at"] is None
-    assert m["prompt_hash"] == bt.PROMPT_VERSION
-
-
-def test_manifest_save_load_roundtrip(tmp_path, monkeypatch):
-    monkeypatch.setattr(bt, "RUNS_DIR", tmp_path)
-    m = bt.make_manifest(
-        run_id=RUN_ID, input_filename="f", input_sha256="s",
-        model="gpt-4o", batch_id="b", records_submitted=42, request_filename="r",
-    )
-    bt.save_manifest(m)
-    loaded = bt.load_manifest(RUN_ID)
-    assert loaded == m
-
-
-# ---------------------------------------------------------------------------
 # estimate_tokens
 
 def test_estimate_tokens_returns_positive_int():
@@ -309,3 +278,112 @@ def test_chunk_preserves_all_comments(monkeypatch):
 def test_model_limits_has_required_models():
     for model in ("gpt-4o", "gpt-4o-mini", "gpt-5.4", "gpt-5.4-mini", "gpt-o4-mini"):
         assert model in bt.MODEL_LIMITS, f"{model} missing from MODEL_LIMITS"
+
+
+# ---------------------------------------------------------------------------
+# status.json helpers
+
+def test_status_save_load_roundtrip(tmp_path):
+    status = _make_status()
+    bt.save_status(status, tmp_path)
+    loaded = bt.load_status(tmp_path)
+    assert loaded == status
+
+
+# ---------------------------------------------------------------------------
+# _find_next_eligible_job
+
+def test_find_next_eligible_job_first_job_pending():
+    jobs = _make_status()["jobs"]
+    target, warning = bt._find_next_eligible_job(jobs)
+    assert target["job_num"] == 1
+    assert warning is None
+
+
+def test_find_next_eligible_job_after_completed():
+    jobs = [
+        {"job_num": 1, "status": "completed", "batch_id": "b1",
+         "records_submitted": 60, "records_completed": 60, "records_failed": 0,
+         "submitted_at": "t", "completed_at": "t", "run_id": "r1"},
+        {"job_num": 2, "status": "pending", "batch_id": None,
+         "records_submitted": 40, "records_completed": None, "records_failed": None,
+         "submitted_at": None, "completed_at": None, "run_id": "r2"},
+    ]
+    target, warning = bt._find_next_eligible_job(jobs)
+    assert target["job_num"] == 2
+    assert warning is None
+
+
+def test_find_next_eligible_job_blocked_by_in_progress():
+    jobs = [
+        {"job_num": 1, "status": "in_progress", "batch_id": "b1",
+         "records_submitted": 60, "records_completed": None, "records_failed": None,
+         "submitted_at": "t", "completed_at": None, "run_id": "r1"},
+        {"job_num": 2, "status": "pending", "batch_id": None,
+         "records_submitted": 40, "records_completed": None, "records_failed": None,
+         "submitted_at": None, "completed_at": None, "run_id": "r2"},
+    ]
+    target, warning = bt._find_next_eligible_job(jobs)
+    assert target is None
+    assert warning is not None
+    assert "in_progress" in warning
+
+
+def test_find_next_eligible_job_all_completed():
+    jobs = [
+        {"job_num": 1, "status": "completed", "batch_id": "b1",
+         "records_submitted": 60, "records_completed": 60, "records_failed": 0,
+         "submitted_at": "t", "completed_at": "t", "run_id": "r1"},
+    ]
+    target, warning = bt._find_next_eligible_job(jobs)
+    assert target is None
+    assert warning is None
+
+
+def test_resume_from_status_json(tmp_path):
+    """Reload a status.json with one completed job and find the next pending job."""
+    jobs = [
+        {"job_num": 1, "run_id": "r1", "status": "completed", "batch_id": "b1",
+         "records_submitted": 60, "records_completed": 58, "records_failed": 2,
+         "submitted_at": "2026-05-06T10:00:00+00:00", "completed_at": "2026-05-06T11:00:00+00:00"},
+        {"job_num": 2, "run_id": "r2", "status": "pending", "batch_id": None,
+         "records_submitted": 40, "records_completed": None, "records_failed": None,
+         "submitted_at": None, "completed_at": None},
+    ]
+    bt.save_status(_make_status(jobs), tmp_path)
+    loaded = bt.load_status(tmp_path)
+    target, warning = bt._find_next_eligible_job(loaded["jobs"])
+    assert target["job_num"] == 2
+    assert warning is None
+
+
+# ---------------------------------------------------------------------------
+# normalize: out-of-order and duplicate custom_id
+
+def test_out_of_order_output_reconciled_by_custom_id():
+    """Raw lines processed in any order are mapped to the correct comment."""
+    c2 = {**COMMENT_ITEM, "comment_id": "99999", "title": "Second comment"}
+    lookup = {COMMENT_ITEM["comment_id"]: COMMENT_ITEM, "99999": c2}
+
+    line_for_99999 = {
+        **RAW_SUCCESS_LINE,
+        "custom_id": "comment_99999",
+    }
+    line_for_87914 = RAW_SUCCESS_LINE
+
+    r1 = bt.normalize_output_line(line_for_99999, lookup, RUN_ID, ANALYZED_AT, MODEL, bt.PROMPT_VERSION)
+    r2 = bt.normalize_output_line(line_for_87914, lookup, RUN_ID, ANALYZED_AT, MODEL, bt.PROMPT_VERSION)
+
+    assert r1["comment_id"] == "99999"
+    assert r1["input_title"] == "Second comment"
+    assert r2["comment_id"] == "87914"
+    assert r2["input_title"] == COMMENT_ITEM["title"]
+
+
+def test_duplicate_custom_id_both_produce_valid_records():
+    """Two raw lines with the same custom_id each produce a valid record."""
+    r1 = bt.normalize_output_line(RAW_SUCCESS_LINE, COMMENT_LOOKUP, RUN_ID, ANALYZED_AT, MODEL, bt.PROMPT_VERSION)
+    r2 = bt.normalize_output_line(RAW_SUCCESS_LINE, COMMENT_LOOKUP, RUN_ID, ANALYZED_AT, MODEL, bt.PROMPT_VERSION)
+    assert r1["comment_id"] == r2["comment_id"] == "87914"
+    assert r1["error"] is None
+    assert r2["error"] is None
