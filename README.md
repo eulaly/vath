@@ -1,8 +1,8 @@
 
 # Table of Contents
 
-    1.  [Project Goals](#org2da6874)
-        1.  [Research questions](#org1a2b8b3)
+1.  [Project Goals](#org2da6874)
+    1.  [Research questions](#org1a2b8b3)
     2.  [Architecture](#orgfabfcd9)
         1.  [Scraper](#org2c5c7a2)
         2.  [Analysis](#org72990f4)
@@ -47,7 +47,7 @@
 3.  Display: streamlit
 4.  Storage: jsonl, csv, parquet
 
-![img](//pipeline-v1.2.3.svg)
+![img](./docs/pipeline-v1.2.3.svg)
 
 
 <a id="org2c5c7a2"></a>

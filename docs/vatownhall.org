@@ -26,7 +26,7 @@
 3. Display: streamlit
 4. Storage: jsonl, csv, parquet
 
-[[file://./pipeline-v1.2.3.svg]]
+![](./docs/pipeline-v1.2.3.svg)
    
 *** Scraper
 Scrapy provides a simple mechanism for retrieving, parsing, and saving content form the forums.
