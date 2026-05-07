@@ -1,18 +1,18 @@
 
 # Table of Contents
 
-    1.  [Project Goals](#orgf37a106)
-        1.  [Research questions](#orgec50d46)
-    2.  [Architecture](#org7a5389e)
-        1.  [Scraper](#org7771df2)
-        2.  [Analysis](#org16a9e36)
-        3.  [Storage](#org7341391)
-    3.  [Instructions](#org692b2f6)
-1.  [Roadmap](#org9f21934)
+    1.  [Project Goals](#org2da6874)
+        1.  [Research questions](#org1a2b8b3)
+    2.  [Architecture](#orgfabfcd9)
+        1.  [Scraper](#org2c5c7a2)
+        2.  [Analysis](#org72990f4)
+        3.  [Storage](#org58a5b72)
+    3.  [Instructions](#org24fe465)
+1.  [Roadmap](#org5739d49)
 
 
 
-<a id="orgf37a106"></a>
+<a id="org2da6874"></a>
 
 ## Project Goals
 
@@ -23,7 +23,7 @@
 3.  Generalize to other public comment tools.
 
 
-<a id="orgec50d46"></a>
+<a id="org1a2b8b3"></a>
 
 ### Research questions
 
@@ -38,7 +38,7 @@
     (I anticipate this will not be measurable from currently available data)
 
 
-<a id="org7a5389e"></a>
+<a id="orgfabfcd9"></a>
 
 ## Architecture
 
@@ -47,8 +47,10 @@
 3.  Display: streamlit
 4.  Storage: jsonl, csv, parquet
 
+![img](//pipeline-v1.2.3.svg)
 
-<a id="org7771df2"></a>
+
+<a id="org2c5c7a2"></a>
 
 ### Scraper
 
@@ -59,7 +61,7 @@ Scrapy provides a simple mechanism for retrieving, parsing, and saving content f
 3.  Individual comment page: \`viewcomments.cfm?commentid=X\` - shows regulation title + brief description at the top, plus the comment
 
 
-<a id="org16a9e36"></a>
+<a id="org72990f4"></a>
 
 ### Analysis
 
@@ -101,7 +103,7 @@ We selected gpt-5.4-mini for a good balance of quality, cost, and time.
     \`\`\`
 
 
-<a id="org7341391"></a>
+<a id="org58a5b72"></a>
 
 ### Storage
 
@@ -120,7 +122,7 @@ We selected gpt-5.4-mini for a good balance of quality, cost, and time.
 -   Once complete, the cleanup script saves \`review.csv\`, \`review.pqt\`, and \`review.sqlite\` in this folder.
 
 
-<a id="org692b2f6"></a>
+<a id="org24fe465"></a>
 
 ## Instructions
 
@@ -144,7 +146,7 @@ We selected gpt-5.4-mini for a good balance of quality, cost, and time.
     \`python analysis/openai<sub>batch.py</sub> submit\`
 
 
-<a id="org9f21934"></a>
+<a id="org5739d49"></a>
 
 # Roadmap
 
