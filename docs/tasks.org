@@ -244,9 +244,9 @@ python analysis/openai_batch.py submit
 - tests: passing (pytest tests/openai_batch.py tests/openai_realtime.py tests/tokenizer.py)
 - datetime: [2026-05-06 Wed]
 
-* === Backlog ===
-* [ ] X: analysis validation view
+* [X] t1.3: cleanup model output and rejoin
 create a lightweight validation script that joins raw comments to normalized analysis output and writes a human-reviewable csv.
+review create_csv for the simple approach - keep this regardless
 
 ** acceptance criteria
 1. input raw scrape jsonl and all *-output.jsonl files in a dir
@@ -255,7 +255,8 @@ create a lightweight validation script that joins raw comments to normalized ana
    - forum_id, comment_id, title, text, date, author
    - stance, stance_confidence, stance_rationale, tone, tags
    - error, truncated, analyzed_at, prompt_version, model
-4. print validation counts
+4. output parquet?
+5. print validation counts
    - raw comments
    - analyzed records
    - joined records
@@ -264,15 +265,29 @@ create a lightweight validation script that joins raw comments to normalized ana
    - error records
    - stance counts
    - tone counts
-5. tests cover join behavior and missing/duplicate ids
+6. tests cover join behavior and missing/duplicate ids
+
+** notes
+- analysis/create_csv.py: reads raw scrape JSONL + all job*-output.jsonl in a job dir (skips *-output-raw.jsonl); left-joins on comment_id; writes review.csv (UTF-8 BOM for Excel); optional --parquet.
+- Uses pd.read_json(path, lines=True) — no manual JSON parsing.
+- Prints summary counts: raw/analyzed/joined/unanalyzed/errors/duplicate IDs, stance distribution, tone distribution.
+
+*** usage
+#+begin_src sh
+python analysis/create_csv.py output/f452.jsonl analysis/jobs/f452-1/
+python analysis/create_csv.py output/f452.jsonl analysis/jobs/f452-1/ --parquet
+# output: analysis/jobs/f452-1/review.csv (and optionally review.parquet)
+#+end_src
 
 ** evidence
 - commit:
-- tests:
-- csv:
-- datetime:       
-* [ ] X: text encoding cleanup
+- tests: passing (pytest tests/create_csv.py tests/encoding.py)
+- csv: analysis/jobs/f452-1/review.csv
+- datetime: [2026-05-07 Thu]
+
+* [X] t1.1.1: text encoding cleanup
 fix mojibake in scraped text before analysis/reporting, especially curly quotes showing as â€™.
+
 
 ** acceptance criteria
 1. identify whether mojibake exists in raw scrape, analysis output, or csv export only
@@ -286,11 +301,29 @@ fix mojibake in scraped text before analysis/reporting, especially curly quotes 
    - â€”
 5. document whether repaired text is used for model input
 
+** notes
+- Diagnosis: f452.jsonl raw data is CLEAN — proper Unicode throughout (U+2019, U+201C, etc.). The DEFAULT_RESPONSE_ENCODING=utf-8 spider setting is working for this site. No mojibake or FFFD chars found.
+- The encoding issue would surface for forums whose server sends cp1252 bytes (0x91-0x97 range) embedded in otherwise UTF-8 content. FFFD replacement chars appear when the UTF-8 decoder hits those bytes. Once the byte is replaced by FFFD, the original character cannot be recovered.
+- Repair layer: analysis/encoding.py applied in analysis/validate.py at reporting time. Raw scrape JSONL is never modified (AC3).
+- Model input: repair_text() is NOT applied in build_messages() for this dataset since raw data is clean. Can be added if a future forum produces dirty text.
+- Spider: DEFAULT_RESPONSE_ENCODING=utf-8 remains. If a future forum genuinely sends cp1252, change to 'cp1252' and apply ftfy post-decode in the item pipeline.
+
 ** evidence
 - commit:
-- tests:
-- before/after sample:
-- datetime:
+- tests: passing (pytest tests/encoding.py)
+- before/after sample: N/A — f452.jsonl is clean; tests cover synthetic mojibake patterns
+- datetime: [2026-05-07 Thu]
+* === Backlog ===
+* [ ] X: first dash explorer
+create a local dash app for exploring one forum analysis dataset.
+
+** acceptance criteria
+1. load parquet/csv review dataset
+2. show stance counts, tone counts, tag counts, and confidence histogram
+3. provide filters for stance, tone, confidence, tag, and text search
+4. show filtered comment table
+5. clicking/selecting a comment shows full text and model rationale
+6. app runs locally with one command
 * [ ] X: complete proposal information
 Ensure we capture as much useful information as possible about the actual proposal - contact information, etc. what the state actually says about what was posted. 
 ** acceptance criteria
