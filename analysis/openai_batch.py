@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-analysis_batch.py — OpenAI Batch API job runner
+openai_batch.py — OpenAI Batch API job runner
 
 Run tokenizer.py first to generate report.json, then:
     create   <report.json> --model <model>   — build job directory
@@ -8,7 +8,7 @@ Run tokenizer.py first to generate report.json, then:
     status   [--job N] [--dir DIR]           — check job status
     download [--job N] [--dir DIR]           — download + normalize completed jobs
 
-DIR is a name under analysis/gpt4o/jobs/ (default: most recently created).
+DIR is a name under analysis/jobs/ (default: most recently created).
 """
 
 import argparse
@@ -52,17 +52,24 @@ _MODEL_ENCODING: dict[str, str] = {
     "gpt-4o-mini":   "o200k_base",
     "gpt-o4-mini":   "o200k_base",
 }
-_LIMIT_BUFFER = 0.90
+_LIMIT_BUFFER = 0.80
 
 
 def estimate_tokens(messages: list[dict], model: str) -> int:
-    """Exact token count via tiktoken; falls back to chars/3 + 4 overhead per message."""
+    """Token count per OpenAI cookbook chat formula; falls back to chars/3."""
     try:
         import tiktoken
         enc = tiktoken.get_encoding(_MODEL_ENCODING.get(model, "o200k_base"))
-        return sum(4 + len(enc.encode(m["content"])) for m in messages)
+        # Per OpenAI cookbook for gpt-4o: 3 overhead per message + role + content;
+        # plus 3 tokens for the reply primer (<|start|>assistant<|message|>).
+        total = 3  # reply primer
+        for m in messages:
+            total += 3
+            total += len(enc.encode(m.get("role", "")))
+            total += len(enc.encode(m["content"]))
+        return total
     except ImportError:
-        return sum(4 + len(m["content"]) // 3 for m in messages)
+        return 3 + sum(3 + len(m["content"]) // 3 for m in messages)
 
 
 def chunk_comments_by_tokens(
@@ -91,7 +98,7 @@ def chunk_comments_by_tokens(
 # ---------------------------------------------------------------------------
 # Prompt
 
-_DEFAULT_PROMPT_FILE = Path(__file__).parent.parent / "prompt-1.txt"
+_DEFAULT_PROMPT_FILE = Path(__file__).parent / "prompt-1.txt"
 SYSTEM_PROMPT = _DEFAULT_PROMPT_FILE.read_text(encoding="utf-8").strip()
 PROMPT_VERSION = hashlib.sha256(SYSTEM_PROMPT.encode("utf-8")).hexdigest()[:7]
 
@@ -375,7 +382,7 @@ def cmd_create(args) -> None:
 
     print(f"Created: {job_dir.name}")
     print(f"  {len(chunks)} job(s)  |  {len(comments)} comments  |  model: {args.model}")
-    print(f"\nNext:  python analysis/gpt4o/analysis_batch.py submit")
+    print(f"\nNext:  python analysis/openai_batch.py submit")
 
 
 # ---------------------------------------------------------------------------
@@ -431,7 +438,7 @@ def cmd_submit(args, client) -> None:
     save_status(status, job_dir)
 
     print(f"Job {n} submitted: {batch.id}  ({batch.status})")
-    print(f"  python analysis/gpt4o/analysis_batch.py status")
+    print(f"  python analysis/openai_batch.py status")
 
 
 # ---------------------------------------------------------------------------

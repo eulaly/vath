@@ -3,10 +3,11 @@
 tokenizer.py — estimate token usage and cost for a batch analysis run.
 
 Usage:
-    python analysis/gpt4o/tokenizer.py output/f452.jsonl [--prompt analysis/prompt-1.txt]
+    python analysis/tokenizer.py output/f452.jsonl [--prompt analysis/prompt-1.txt]
+    python analysis/tokenizer.py analysis/jobs/f452-1/job1-input.jsonl  # count actual tokens in a job
 
-Prints a per-model comparison table and writes report.json next to the input file.
-Run this before analysis_batch.py create.
+Prints a per-model comparison table and writes reports/<stem>-report.json.
+Run this before openai_batch.py create.
 """
 
 import argparse
@@ -17,7 +18,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-import analysis_batch as _ab
+import openai_batch as _ab
 
 # Input pricing ($/1M tokens, batch API) — from docs/openai.md, updated 2026-05-05.
 # Add Anthropic/other models here when needed; only models with a LIMITS entry are reported.
@@ -66,6 +67,32 @@ def compute_report(
     return report
 
 
+def count_input_tokens(path: Path, model: str = "gpt-4o") -> dict:
+    """Count tokens in an existing job input JSONL (batch request format).
+
+    Each line must have body.messages (as written by build_batch_request_line).
+    Returns {"total_tokens": int, "total_requests": int, "min": int, "max": int, "mean": float}.
+    """
+    counts = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            req = json.loads(line)
+            messages = req["body"]["messages"]
+            counts.append(_ab.estimate_tokens(messages, model))
+    if not counts:
+        return {"total_tokens": 0, "total_requests": 0, "min": 0, "max": 0, "mean": 0.0}
+    return {
+        "total_tokens": sum(counts),
+        "total_requests": len(counts),
+        "min": min(counts),
+        "max": max(counts),
+        "mean": round(sum(counts) / len(counts), 1),
+    }
+
+
 def print_table(report: dict) -> None:
     """Print a human-readable model comparison table to stdout."""
     print(f"\nInput:    {report['input_file']}")
@@ -90,11 +117,21 @@ def print_table(report: dict) -> None:
     print()
 
 
+def _is_job_input(path: Path) -> bool:
+    """Return True if this JSONL looks like a batch request file (has custom_id)."""
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                return "custom_id" in json.loads(line)
+    return False
+
+
 def main() -> None:
-    _default_prompt = Path(__file__).parent.parent / "prompt-1.txt"
+    _default_prompt = Path(__file__).parent / "prompt-1.txt"
 
     parser = argparse.ArgumentParser(description="Estimate batch token usage and cost.")
-    parser.add_argument("input", help="Scraped JSONL file")
+    parser.add_argument("input", help="Scraped JSONL or job input JSONL (jobN-input.jsonl)")
     parser.add_argument(
         "--prompt",
         default=str(_default_prompt),
@@ -106,6 +143,16 @@ def main() -> None:
     if not input_path.exists():
         sys.exit(f"File not found: {input_path}")
 
+    # --- Mode: count tokens in an existing job input file ---
+    if _is_job_input(input_path):
+        result = count_input_tokens(input_path)
+        print(f"\nJob input: {input_path.name}")
+        print(f"  Requests : {result['total_requests']:,}")
+        print(f"  Tokens   : {result['total_tokens']:,}")
+        print(f"  Per-req  : min={result['min']}  max={result['max']}  mean={result['mean']}")
+        return
+
+    # --- Mode: estimate from raw scrape file and write report.json ---
     prompt_path = Path(args.prompt)
     if not prompt_path.exists():
         sys.exit(f"Prompt file not found: {prompt_path}")
@@ -131,10 +178,12 @@ def main() -> None:
 
     print_table(report)
 
-    out_path = input_path.parent / "report.json"
+    reports_dir = Path(__file__).parent.parent / "reports"
+    reports_dir.mkdir(exist_ok=True)
+    out_path = reports_dir / f"{input_path.stem}-report.json"
     out_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Report written to: {out_path}")
-    print(f"\nNext:  python analysis/gpt4o/analysis_batch.py create {out_path} --model <model>")
+    print(f"\nNext:  python analysis/openai_batch.py create {out_path} --model <model>")
 
 
 if __name__ == "__main__":

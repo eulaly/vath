@@ -1,4 +1,4 @@
-"""Unit tests for analysis/gpt4o/tokenizer.py — no real API calls."""
+"""Unit tests for analysis/tokenizer.py — no real API calls."""
 
 import io
 import json
@@ -9,9 +9,9 @@ from unittest.mock import patch
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "analysis" / "gpt4o"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "analysis"))
 import tokenizer as tk
-import analysis_batch as ab
+import openai_batch as ab
 
 
 # ---------------------------------------------------------------------------
@@ -199,3 +199,52 @@ def test_report_json_roundtrip(tmp_path):
     assert loaded["total_comments"] == report["total_comments"]
     assert loaded["input_tokens"] == report["input_tokens"]
     assert loaded["gpt-4o-mini"]["jobs"] == report["gpt-4o-mini"]["jobs"]
+
+
+# ---------------------------------------------------------------------------
+# count_input_tokens
+
+def _make_job_input(tmp_path, comments, forum=None) -> Path:
+    """Write a batch request JSONL in the same format as job1-input.jsonl."""
+    p = tmp_path / "job1-input.jsonl"
+    with open(p, "w", encoding="utf-8") as f:
+        for c in comments:
+            f.write(json.dumps(ab.build_batch_request_line(c, forum, "gpt-4o-mini")) + "\n")
+    return p
+
+
+def test_count_input_tokens_matches_estimate(tmp_path):
+    """count_input_tokens on a freshly written job file equals the sum estimate_tokens produces."""
+    p = _make_job_input(tmp_path, COMMENTS, FORUM_ITEM)
+    result = tk.count_input_tokens(p, "gpt-4o-mini")
+    expected = sum(
+        ab.estimate_tokens(ab.build_messages(c, FORUM_ITEM)[0], "gpt-4o-mini")
+        for c in COMMENTS
+    )
+    assert result["total_tokens"] == expected
+    assert result["total_requests"] == len(COMMENTS)
+
+
+def test_count_input_tokens_fields(tmp_path):
+    p = _make_job_input(tmp_path, COMMENTS, FORUM_ITEM)
+    result = tk.count_input_tokens(p)
+    assert set(result.keys()) == {"total_tokens", "total_requests", "min", "max", "mean"}
+    assert result["min"] <= result["mean"] <= result["max"]
+    assert result["min"] > 0
+
+
+def test_count_input_tokens_empty_file(tmp_path):
+    p = tmp_path / "empty.jsonl"
+    p.write_text("", encoding="utf-8")
+    result = tk.count_input_tokens(p)
+    assert result["total_tokens"] == 0
+    assert result["total_requests"] == 0
+
+
+def test_count_input_tokens_includes_system_prompt(tmp_path):
+    """Token count must be higher than user-message-only text length / 3 (prompt adds tokens)."""
+    p = _make_job_input(tmp_path, [COMMENT_A], FORUM_ITEM)
+    result = tk.count_input_tokens(p)
+    user_chars = len(COMMENT_A.get("text", ""))
+    # system prompt alone is hundreds of tokens; total must exceed naive user-text estimate
+    assert result["total_tokens"] > user_chars // 3

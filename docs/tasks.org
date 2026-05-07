@@ -201,44 +201,48 @@ batch processing should  be a resumable job queue, not a one-shot script. the us
    - remaining-comment detection
 
 ** notes
-- analysis/gpt4o/tokenizer.py: new standalone script; imports analysis_batch for MODEL_LIMITS, estimate_tokens, build_messages. Reads input JSONL + prompt, computes per-model jobs/cost/time table, writes report.json to input file's directory. MODEL_PRICING dict lives here (not in analysis_batch).
-- analysis/gpt4o/analysis_batch.py: fully rewritten with four subcommands: create, submit, status, download. No longer uses REQUESTS_DIR / RAW_DIR / RUNS_DIR.
-- Job directories: analysis/gpt4o/jobs/<stem[:8]>-N/ (e.g. f452-1). Each run is self-contained: forum.jsonl, prompt.txt, report.json, jobN-input.jsonl, jobN-output-raw.jsonl, jobN-output.jsonl, jobN-errors.jsonl.
+- analysis/tokenizer.py: new standalone script; imports openai_batch for MODEL_LIMITS, estimate_tokens, build_messages. Reads input JSONL + prompt, computes per-model jobs/cost/time table, writes reports/<stem>-report.json. MODEL_PRICING dict lives here (not in openai_batch). Pass a jobN-input.jsonl to count actual tokens instead.
+- analysis/openai_batch.py: fully rewritten with four subcommands: create, submit, status, download. Job dirs at analysis/jobs/<stem[:8]>-N/.
+- Job directories: analysis/jobs/<stem[:8]>-N/ (e.g. f452-1). Each run is self-contained: forum.jsonl, prompt.txt, report.json, jobN-input.jsonl, jobN-output-raw.jsonl, jobN-output.jsonl, jobN-errors.jsonl.
 - status.json: tracks all jobs with pending/submitted/in_progress/completed/failed states. Updated by submit, status, download.
 - _find_next_eligible_job: pure function for testability. Returns (next_pending_job, None) or (None, warning). Blocks submission if previous job is in_progress/submitted.
 - create: no API key required. Reads report.json, re-chunks comments, writes all jobN-input.jsonl files, writes status.json.
 - submit: uploads jobN-input.jsonl to Files API, creates batch, updates status.json to 'submitted'. Will not stack batches.
 - status: retrieves batch from OpenAI, updates status.json counts and status.
 - download: auto-runs status first, downloads output_file_id → jobN-output-raw.jsonl, error_file_id → jobN-errors.jsonl, normalizes → jobN-output.jsonl. Updates status.json.
-- tests/test_tokenizer.py: 15 tests for compute_report schema, cost/time calculation, MODEL_PRICING coverage, print_table output, report.json round-trip.
+- tests/tokenizer.py: 19 tests for compute_report schema, cost/time calculation, MODEL_PRICING coverage, print_table output, count_input_tokens, report.json round-trip.
+- Token limit buffer: _LIMIT_BUFFER=0.80 (20% headroom). Estimate uses OpenAI cookbook chat formula (role tokens + 3-token reply primer). Verify a job file with: python analysis/tokenizer.py analysis/jobs/<dir>/jobN-input.jsonl
 
 *** usage
-#+begin_src sh
+#+begin_src powershell
 # 1. estimate tokens and cost
-python analysis/gpt4o/tokenizer.py output/f452.jsonl --prompt analysis/prompt-1.txt
-# writes output/report.json
+python analysis/tokenizer.py output/f452.jsonl --prompt analysis/prompt-1.txt
+# writes reports/f452-report.json
 
-# 2. create job directory (no api key needed)
-python analysis/gpt4o/analysis_batch.py create output/report.json --model gpt-4o-mini
-# creates analysis/gpt4o/jobs/f452-1/
+# 2. verify actual tokens in a job file (optional sanity check)
+python analysis/tokenizer.py analysis/jobs/f452-1/job1-input.jsonl
 
-# 3. submit first job
-python analysis/gpt4o/analysis_batch.py submit
+# 3. create job directory (no api key needed)
+python analysis/openai_batch.py create reports/f452-report.json --model gpt-5.4-mini
+# creates analysis/jobs/f452-1/
 
-# 4. check status (repeat until completed)
-python analysis/gpt4o/analysis_batch.py status
+# 4. submit first job
+python analysis/openai_batch.py submit
 
-# 5. download and normalize
-python analysis/gpt4o/analysis_batch.py download
+# 5. check status (repeat until completed)
+python analysis/openai_batch.py status
 
-# 6. submit next job (if multi-job run), then repeat 4-5
-python analysis/gpt4o/analysis_batch.py submit
+# 6. download and normalize
+python analysis/openai_batch.py download
+
+# 7. submit next job (if multi-job run), then repeat 5-6
+python analysis/openai_batch.py submit
 #+end_src
 
 ** evidence
 - commit:
-- tests: passing (pytest tests/analysis_gpt4o_batch.py tests/test_tokenizer.py)
-- datetime: [2026-05-05 Tue]
+- tests: passing (pytest tests/openai_batch.py tests/openai_realtime.py tests/tokenizer.py)
+- datetime: [2026-05-06 Wed]
 
 * === Backlog ===
 * [ ] X: analysis validation view

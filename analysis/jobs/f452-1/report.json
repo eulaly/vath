@@ -1,0 +1,43 @@
+{
+  "prompt": "analysis\\prompt-1.txt",
+  "prompt_hash": "cb41250",
+  "input_file": "output\\f452.jsonl",
+  "input_sha256": "59dcc8b13cc2a386977a8b934c498c7e639b7e684a94ca1bfd10a14878670018",
+  "total_comments": 9083,
+  "input_tokens": 6397254,
+  "gpt-5.5": {
+    "jobs": 9,
+    "cost_$": 15.9931,
+    "est_queue_days": 7.11
+  },
+  "gpt-5.4": {
+    "jobs": 9,
+    "cost_$": 7.9966,
+    "est_queue_days": 7.11
+  },
+  "gpt-5.4-mini": {
+    "jobs": 4,
+    "cost_$": 2.399,
+    "est_queue_days": 3.2
+  },
+  "gpt-5.4-nano": {
+    "jobs": 40,
+    "cost_$": 0.6397,
+    "est_queue_days": 31.99
+  },
+  "gpt-4o": {
+    "jobs": 9,
+    "cost_$": 7.9966,
+    "est_queue_days": 7.11
+  },
+  "gpt-4o-mini": {
+    "jobs": 4,
+    "cost_$": 0.4798,
+    "est_queue_days": 3.2
+  },
+  "gpt-o4-mini": {
+    "jobs": 4,
+    "cost_$": 3.5185,
+    "est_queue_days": 3.2
+  }
+}

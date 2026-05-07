@@ -43,3 +43,4 @@ Description and PM notes
 - project dir: `%userprofile%\projects\vath\`
 - python venv: `%userprofile%\projects\vath\venv\scripts\activate`
 - pytest (inside venv): `python -m pytest tests/`
+  - create tests without `test_` prefix, ie: `tests/tokenizer.py` not `tests/test_tokenizer.py`

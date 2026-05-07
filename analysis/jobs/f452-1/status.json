@@ -1,0 +1,57 @@
+{
+  "model": "gpt-5.4-mini",
+  "prompt_hash": "cb41250",
+  "input_file": "output\\f452.jsonl",
+  "input_sha256": "59dcc8b13cc2a386977a8b934c498c7e639b7e684a94ca1bfd10a14878670018",
+  "total_comments": 9083,
+  "input_tokens": 6397254,
+  "est_queue_days": 3.2,
+  "cost_$": 2.399,
+  "total_jobs": 4,
+  "jobs": [
+    {
+      "job_num": 1,
+      "run_id": "76c97113-63aa-43db-8f84-9c60ebcbb105",
+      "status": "completed",
+      "batch_id": "batch_69fb9081639881909be0c40d86edd747",
+      "records_submitted": 2270,
+      "records_completed": 2270,
+      "records_failed": 0,
+      "submitted_at": "2026-05-06T19:03:28.949240+00:00",
+      "completed_at": "2026-05-06T20:09:14+00:00"
+    },
+    {
+      "job_num": 2,
+      "run_id": "b8f3b0bb-f155-4a5c-acce-f3504c0e09aa",
+      "status": "completed",
+      "batch_id": "batch_69fba02df7b481909e96afa1ee8879f5",
+      "records_submitted": 2274,
+      "records_completed": 2274,
+      "records_failed": 0,
+      "submitted_at": "2026-05-06T20:10:21.424330+00:00",
+      "completed_at": "2026-05-06T20:37:11+00:00"
+    },
+    {
+      "job_num": 3,
+      "run_id": "8d769f37-6beb-4a1b-87ee-3f66cdc6adc8",
+      "status": "completed",
+      "batch_id": "batch_69fba69a85488190977792b6f95b614b",
+      "records_submitted": 2282,
+      "records_completed": 2282,
+      "records_failed": 0,
+      "submitted_at": "2026-05-06T20:37:45.586815+00:00",
+      "completed_at": "2026-05-06T21:09:24+00:00"
+    },
+    {
+      "job_num": 4,
+      "run_id": "e6affbc2-ddc9-43a6-b8e9-d1f47e736283",
+      "status": "completed",
+      "batch_id": "batch_69fbe44565748190ad19f17ee3143f8d",
+      "records_submitted": 2257,
+      "records_completed": 2257,
+      "records_failed": 0,
+      "submitted_at": "2026-05-07T01:00:52.886953+00:00",
+      "completed_at": "2026-05-07T09:20:01+00:00"
+    }
+  ]
+}

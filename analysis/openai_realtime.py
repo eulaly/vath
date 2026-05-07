@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-analysis/gpt4o/analysis-realtime.py — Synchronous GPT-4o pipeline for VA Townhall comments.
+analysis/openai_realtime.py — Synchronous GPT-4o pipeline for VA Townhall comments.
 
 Usage:
-    python analysis/gpt4o/analysis-realtime.py <input_jsonl> [--limit {5,10,20,50}] [--model MODEL]
+    python analysis/openai_realtime.py <input_jsonl> [--limit {5,10,20,50}] [--model MODEL]
 
 Output:
-    analysis/gpt4o/forum{id}_{scrape_ts}_{model}_{run_ts}.jsonl
+    analysis/forum{id}_{scrape_ts}_{model}_{run_ts}.jsonl
 """
 
 import argparse
@@ -30,7 +30,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Prompt — loaded from analysis/prompt-1.txt at import time
 
-_PROMPT_FILE = Path(__file__).parent.parent / "prompt-1.txt"
+_PROMPT_FILE = Path(__file__).parent / "prompt-1.txt"
 SYSTEM_PROMPT = _PROMPT_FILE.read_text(encoding="utf-8").strip()
 PROMPT_VERSION = hashlib.sha256(SYSTEM_PROMPT.encode("utf-8")).hexdigest()[:7]
 

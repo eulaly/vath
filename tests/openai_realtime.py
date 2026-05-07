@@ -1,4 +1,4 @@
-"""Unit tests for analysis/gpt4o/analysis_realtime.py — no real API calls."""
+"""Unit tests for analysis/openai_realtime.py — no real API calls."""
 
 import json
 import sys
@@ -7,8 +7,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "analysis" / "gpt4o"))
-import analysis_realtime as rt
+sys.path.insert(0, str(Path(__file__).parent.parent / "analysis"))
+import openai_realtime as rt
 
 
 # ---------------------------------------------------------------------------

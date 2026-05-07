@@ -1,4 +1,4 @@
-"""Unit tests for analysis/gpt4o/analysis_batch.py — no real API calls."""
+"""Unit tests for analysis/openai_batch.py — no real API calls."""
 
 import json
 import sys
@@ -7,8 +7,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "analysis" / "gpt4o"))
-import analysis_batch as bt
+sys.path.insert(0, str(Path(__file__).parent.parent / "analysis"))
+import openai_batch as bt
 
 
 # ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ def test_prompt_version_is_7_hex_chars():
 
 def test_prompt_version_matches_realtime():
     """Both scripts must derive the same PROMPT_VERSION from the same file."""
-    import analysis_realtime as rt
+    import openai_realtime as rt
     assert bt.PROMPT_VERSION == rt.PROMPT_VERSION
 
 
@@ -242,7 +242,8 @@ def test_estimate_tokens_fallback_without_tiktoken(monkeypatch):
     monkeypatch.setitem(_sys.modules, "tiktoken", None)
     messages = [{"role": "user", "content": "x" * 300}]
     result = bt.estimate_tokens(messages, "gpt-4o")
-    assert result == 4 + 300 // 3
+    # fallback: 3 primer + (3 + 300//3) per message
+    assert result == 3 + (3 + 300 // 3)
 
 
 # ---------------------------------------------------------------------------
