@@ -280,10 +280,10 @@ python analysis/create_csv.py output/f452.jsonl analysis/jobs/f452-1/ --parquet
 #+end_src
 
 ** evidence
-- commit:
+- commit: 28d6d22
 - tests: passing (pytest tests/create_csv.py tests/encoding.py)
 - csv: analysis/jobs/f452-1/review.csv
-- datetime: [2026-05-07 Thu]
+- datetime: [2026-05-07 Thu 17:23]
 
 * [X] t1.1.1: text encoding cleanup
 fix mojibake in scraped text before analysis/reporting, especially curly quotes showing as â€™.
@@ -309,13 +309,33 @@ fix mojibake in scraped text before analysis/reporting, especially curly quotes 
 - Spider: DEFAULT_RESPONSE_ENCODING=utf-8 remains. If a future forum genuinely sends cp1252, change to 'cp1252' and apply ftfy post-decode in the item pipeline.
 
 ** evidence
-- commit:
+- commit: 1ea696d
 - tests: passing (pytest tests/encoding.py)
 - before/after sample: N/A — f452.jsonl is clean; tests cover synthetic mojibake patterns
-- datetime: [2026-05-07 Thu]
-* === Backlog ===
-* [ ] X: first dash explorer
-create a local dash app for exploring one forum analysis dataset.
+- datetime: [2026-05-07 Thu 17:00]
+
+* [ ] t1.4: graph data prep
+create a script ./viz/prototype_charts.py generating individual plotly charts for exploring graphs to embed into streamlit or dash later
+1. in create_csv.py, create helper columns:
+   - stance_signed = {"support":1, "oppose":-1, "neutral":0, "unknown":0}
+   - stance_weighted = stance_signed * stance_confidence
+   - is_support_oppose = stance in ["support", "oppose"]
+   - date_day
+   - date_hour
+   - text_norm
+   - text_hash
+   - confidence_bucket = 'low' <.7 | 'med' .7-.89 | 'high' >=.9
+
+2. add forum_url, forum_collected_date to scraper
+        
+2. create graph for Stance/Share
+   - stacked h-bar with % support/oppose/neutral/unknown + raw totals, eg  63% (5720) / 37% (3320) / 0.09% (8) / 0.37% (34)
+   - later, consider centered diverging h-bar: oppose ← | neutral/unknown | → support
+3. create graph for Stance/Time: 
+   - cumulative support/oppose % over time
+4. create graph for Stance/Tone (heatmap count)
+5. create graph for Confidence/Stance (boxplot or histogram)
+   
 
 ** acceptance criteria
 1. load parquet/csv review dataset
@@ -324,6 +344,16 @@ create a local dash app for exploring one forum analysis dataset.
 4. show filtered comment table
 5. clicking/selecting a comment shows full text and model rationale
 6. app runs locally with one command
+
+** notes
+
+** evidence
+- commit:
+- tests:
+- datetime:
+    
+* === Backlog ===
+
 * [ ] X: complete proposal information
 Ensure we capture as much useful information as possible about the actual proposal - contact information, etc. what the state actually says about what was posted. 
 ** acceptance criteria
