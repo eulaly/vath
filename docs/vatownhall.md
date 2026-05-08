@@ -45,7 +45,7 @@
 3.  Display: streamlit
 4.  Storage: jsonl, csv, parquet
 
-[pipeline](docs/pipeline-v1.2.3.svg)
+![pipeline](docs/pipeline-v1.2.3.svg)
 
 
 <a id="org88a423d"></a>
