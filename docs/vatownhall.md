@@ -1,4 +1,3 @@
-
 # Table of Contents
 
 1.  [Project Goals](#org214014d)
@@ -46,7 +45,7 @@
 3.  Display: streamlit
 4.  Storage: jsonl, csv, parquet
 
-![](./docs/pipeline-v1.2.3.svg)
+[pipeline](docs/pipeline-v1.2.3.svg)
 
 
 <a id="org88a423d"></a>
