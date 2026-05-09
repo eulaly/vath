@@ -354,8 +354,9 @@ data pulls entirely from the job; goal is to point viz/streamlit.py at any job/ 
 - tests: from root dir, `streamlit run viz/streamlit.py <job-dir>`
 - datetime: [2026-05-08 Fri 23:44]
   
-* [ ] t1.6 host streamlit via dockerfile
+* +[ ] t1.6 host streamlit via dockerfile+
 planning to deploy manually, get cert, etc etc. probably dont care about https?
++using streamlit.app instead+
 ** acceptance criteria
 1. write dockerfile with slim image
 
