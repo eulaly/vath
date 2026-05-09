@@ -7,8 +7,9 @@
 2.  Make data and insights broadly available.
 3.  Generalize to other public comment tools.
 
+Initial research is complete and functional 
 ![img](./docs/streamlit-snapshot.png)
-<a id="org1a2b8b3"></a>
+
 
 ### Research questions
 

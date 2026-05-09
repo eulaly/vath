@@ -335,7 +335,7 @@ create ./viz/prototype_charts.py generating individual plotly charts for explori
 - tests: see viz/proto and viz/chart_tests
 - datetime: [2026-05-08 Fri 08:38]
 
-* [ ] t1.5: streamlit
+* [X] t1.5: streamlit
 create organized webpage displaying useful information from completed job and analysis
 
 ** acceptance criteria
@@ -350,11 +350,16 @@ create organized webpage displaying useful information from completed job and an
 data pulls entirely from the job; goal is to point viz/streamlit.py at any job/ folder and have everything it needs
 
 ** evidence
-- commit: 
+- commit: cc16acb
 - tests: from root dir, `streamlit run viz/streamlit.py <job-dir>`
+- datetime: [2026-05-08 Fri 23:44]
+  
+* [ ] t1.6 host streamlit via dockerfile
+planning to deploy manually, get cert, etc etc. probably dont care about https?
+** acceptance criteria
+1. write dockerfile with slim image
 
-* [ ] t1.6 host streamlit
-figure out how to host this, locally or via streamlit servers
+** notes
    
 * === Backlog ===
 - add forum_url, forum_collected_date to scraper (to add to viz)
