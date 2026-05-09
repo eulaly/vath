@@ -7,7 +7,7 @@
 2.  Make data and insights broadly available.
 3.  Generalize to other public comment tools.
 
-Initial research is complete and functional 
+Take a look at https://vatownhall.streamlit.app
 ![img](./docs/streamlit-snapshot.png)
 
 
