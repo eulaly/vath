@@ -1,17 +1,3 @@
-# Table of Contents
-
-1.  [Project Goals](#org2da6874)
-    1.  [Research questions](#org1a2b8b3)
-    2.  [Architecture](#orgfabfcd9)
-        1.  [Scraper](#org2c5c7a2)
-        2.  [Analysis](#org72990f4)
-        3.  [Storage](#org58a5b72)
-    3.  [Instructions](#org24fe465)
-1.  [Roadmap](#org5739d49)
-
-
-
-<a id="org2da6874"></a>
 
 ## Project Goals
 
@@ -21,7 +7,7 @@
 2.  Make data and insights broadly available.
 3.  Generalize to other public comment tools.
 
-
+![img](./docs/streamlit-snapshot.svg)
 <a id="org1a2b8b3"></a>
 
 ### Research questions
@@ -66,9 +52,9 @@ Scrapy provides a simple mechanism for retrieving, parsing, and saving content f
 
 Google and Amazon both return generic sentiment (tone of writing: positive/negative), not stance (for/against the regulation): "I strongly believe the government should NOT interfere" is negative tone but "against" the regulation.  We add the proposed change as context to the model.
 
-Before sending the comments for sentiment analysis, \`tokenizer.py\` receives the forum to be processed and prompt as inputs, then generates a \`report.json\` estimating tokens (tiktoken), cost, and time to run for multiple models.
+Before sending the comments for sentiment analysis, `tokenizer.py` receives the forum to be processed and prompt as inputs, then generates a `report.json` estimating tokens (tiktoken), cost, and time to run for multiple models.
 
-Then, the batch processing scripts uses the \`report.json\` to create multiple jobs, with subcommands to download and check their status. 
+Then, the batch processing scripts uses the `report.json` to create multiple jobs, with subcommands to download and check their status. 
 
 We selected gpt-5.4-mini for a good balance of quality, cost, and time.
 
