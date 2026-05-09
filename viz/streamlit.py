@@ -1,14 +1,17 @@
-# streamlit run analysis/viz/streamlit.py
+# streamlit run viz/streamlit.py -- --jobs-dir analysis/jobs/f452-1
 import argparse
 from pathlib import Path
 from datetime import datetime as dt
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
-import plotly.subplots as ps
 import streamlit as st
 
-workdir = Path("analysis/jobs/f452-1")
+parser = argparse.ArgumentParser()
+parser.add_argument("--jobs-dir", default="analysis/jobs/f452-1", type=Path,
+                    help="Job directory containing review.csv, forum.jsonl, and prompt.txt")
+args, _ = parser.parse_known_args()  # parse_known_args: ignore Streamlit's own argv entries
+workdir = args.jobs_dir
 df = pd.read_csv(workdir/"review.csv")
 df['date_dt'] = pd.to_datetime(df.date)
 df["date_day"] = df["date_dt"].dt.date
@@ -128,14 +131,14 @@ st.subheader("Comment Explorer",anchor=False,divider="gray")
 # comment explorer
 cex_left, cex_right = st.columns([1,1])
 with cex_left:
-    stance = st.multiselect("Filter stance", sorted(df["stance"].dropna().unique()), default=sorted(df["stance"].dropna().unique()))
-    q = st.text_input("Search comment title and text")
-    dff = df[df["stance"].isin(stance)]
-    if q:
-        dff = dff[dff["text"].fillna("").str.contains(q, case=False, regex=False)]
+    filter_stance = st.multiselect("Filter stance", sorted(df["stance"].dropna().unique()), default=sorted(df["stance"].dropna().unique()))
+    filter_tone = st.multiselect("Filter tone", sorted(df["tone"].dropna().unique()), default=sorted(df["tone"].dropna().unique()))
+    dff = df[df["stance"].isin(filter_stance) & df["tone"].isin(filter_tone)]
 
 with cex_right:
-    filter_tone = st.multiselect("Filter tone", sorted(df["tone"].dropna().unique()), default=sorted(df["tone"].dropna().unique()))
+    q = st.text_input("Search comment title and text")
+    if q:
+        dff = dff[dff["text"].fillna("").str.contains(q, case=False, regex=False)]
     st.text(""); st.text("")
     st.text("Showing " + str(len(dff))+ " comments",text_alignment="right", width="stretch")
 

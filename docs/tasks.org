@@ -351,15 +351,13 @@ data pulls entirely from the job; goal is to point viz/streamlit.py at any job/ 
 
 ** evidence
 - commit: 
-- tests: from root dir, `streamlit run viz/streamlit.py`
-
-7. add forum_url, forum_collected_date to scraper
+- tests: from root dir, `streamlit run viz/streamlit.py <job-dir>`
 
 * [ ] t1.6 host streamlit
 figure out how to host this, locally or via streamlit servers
    
 * === Backlog ===
-
+- add forum_url, forum_collected_date to scraper (to add to viz)
 * [ ] X: complete proposal information
 Ensure we capture as much useful information as possible about the actual proposal - contact information, etc. what the state actually says about what was posted. 
 ** acceptance criteria
