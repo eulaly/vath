@@ -1,6 +1,7 @@
-# streamlit run analysis/viz/comment_streamlit2.py
-from datetime import datetime as dt
+# streamlit run analysis/viz/streamlit.py
+import argparse
 from pathlib import Path
+from datetime import datetime as dt
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
@@ -15,25 +16,21 @@ forum = pd.read_json(workdir/"forum.jsonl", lines=True).iloc[0].to_dict()
 prompt = (workdir/"prompt.txt").read_text(encoding="utf-8")
 
 stance_colors = {'oppose':'#ffa15a', 'neutral':'#e377c2','support':'#19d3f3','unknown':'#000000'}
-#stance_colors = {'oppose':'orange', 'neutral':'green','support':'blue','unknown':'gray','mixed':'violet'}
-stance_order = ["oppose", "neutral", "unknown", "support"]
+stance_order = ["oppose", "mixed", "unknown", "neutral", "support"]
 
 st.set_page_config(layout="wide")
-st.title("Virginia Townhall Explorer")
-st.divider()
-st.subheader(forum.get('reg_title'))
+st.title("Virginia Townhall Explorer",anchor=None)
+st.caption("Explore data collected from Virginia's public comment system. Source code at https://github.com/eulaly/vath")
+
+st.subheader("Proposal",anchor=None,divider="gray")
+st.markdown(f"**{forum.get('reg_title')}**")
 st.text(forum.get('reg_desc'))
-st.caption(f"Link: https://www.townhall.virginia.gov/L/Comments.cfm?GDocForumID={forum.get('forum_id')}")
+st.caption(f'Comments posted from {dt.strftime(min(df.date_dt),"%D")}—{dt.strftime(max(df.date_dt),"%D")} at https://www.townhall.virginia.gov/L/Comments.cfm?GDocForumID={forum.get("forum_id")}')
 
-st.write(f'Comments posted from {dt.strftime(min(df.date_dt),"%D")}—{dt.strftime(max(df.date_dt),"%D")}')
-st.write('Data collected on _')
-
-st.subheader("Comment Summary")
-# summary
+st.subheader("Comment Summary",anchor=False,divider="gray")
 summary_left, summary_right = st.columns([1,2])
 with summary_left:
-    # summary table
-    #summary_stats = df.groupby("stance").size().reindex(stance_order,fill_value=0).reset_index(name="count")
+# Summary Table
     summary_stats = (
     df.groupby("stance").size()
       .reindex(stance_order, fill_value=0)
@@ -43,7 +40,7 @@ with summary_left:
 
     st.dataframe(summary_stats, hide_index=True, width="stretch")
 with summary_right:
-# stance div-h
+# Stance div-h
     counts = df["stance"].value_counts()
     stance_divh = go.Figure()
     stance_divh.add_bar(y=["stance"], x=[-counts.get("oppose",0)], name="oppose", orientation="h", marker_color=stance_colors.get('oppose'), text=[counts.get("oppose",0)], textposition="inside")
@@ -52,14 +49,7 @@ with summary_right:
     stance_divh.add_bar(y=["stance"], x=[counts.get("support",0)], name="support", orientation="h", marker_color=stance_colors.get('support'), text=[counts.get("support",0)], textposition="inside")
     stance_divh.update_yaxes(title_text="",showticklabels=False)
     stance_divh.update_layout(barmode="relative", title="", height=180, margin=dict(l=0,r=0,t=0,b=0),xaxis_title="", yaxis_title="",legend=dict(orientation="v",y=0.12))
-                              #legend_orientation="v")
     st.plotly_chart(stance_divh,width='stretch')
-    
-# stance_time
-#stance_order = ["oppose", "neutral","unknown","support"]
-#daily = df.groupby(["date_day", "stance"]).size().reset_index(name="count")
-#stance_time = px.bar(daily, x="date_day", y="count", color="stance", category_orders={"stance": stance_order},color_discrete_map=stance_colors,title="")
-#st.plotly_chart(stance_time, width='stretch')
 
 # Daily Comments Breakdown, 3 Tabs
 daily_wide = (
@@ -89,6 +79,7 @@ cum_share_long = (
     cum_share.reset_index()
       .melt(id_vars="date_day", var_name="stance", value_name="cumulative_share")
 )
+
 
 tab_daily, tab_area, tab_share = st.tabs([
     "Daily",
@@ -132,46 +123,64 @@ with tab_share:
     fig.update_yaxes(tickformat=".0%", range=[0, 1])
     fig.update_layout(height=420, legend_orientation="v")
     st.plotly_chart(fig, width="stretch")
-
-st.subheader("Comment Explorer")    
-
-# stance/tone heatmap
-# TODO add raw values
-# TODO OPT add button to swap between pct/tone <> pct/stance
-x_order = ["unknown","oppose","mixed","neutral","support"]  # includes mixed even if absent; harmless zero column
-y_order = ["positive","neutral","mixed","negative","unclear"]
-tab = pd.crosstab(df["tone"], df["stance"]).reindex(index=y_order, columns=x_order, fill_value=0)
-pct = tab.div(tab.sum(axis=1).replace(0, pd.NA), axis=0).fillna(0)
-fig = px.imshow(
-    pct,
-    x=x_order, y=y_order,
-    text_auto=".0%",
-    aspect="auto",
-    color_continuous_scale="Greens",
-    title="tone by stance, percent within tone",
-)
-fig.update_traces(text=tab.astype(str) + " / " + (pct*100).round(0).astype(int).astype(str) + "%")
-fig.update_layout(height=420, xaxis_title="stance", yaxis_title="tone")
-st.plotly_chart(fig, width='stretch')
-
+    
+st.subheader("Comment Explorer",anchor=False,divider="gray") 
 # comment explorer
-stance = st.multiselect("Filter stance", sorted(df["stance"].dropna().unique()), default=sorted(df["stance"].dropna().unique()))
-q = st.text_input("Search comment text")
-dff = df[df["stance"].isin(stance)]
-if q:
-    dff = dff[dff["text"].fillna("").str.contains(q, case=False, regex=False)]
+cex_left, cex_right = st.columns([1,1])
+with cex_left:
+    stance = st.multiselect("Filter stance", sorted(df["stance"].dropna().unique()), default=sorted(df["stance"].dropna().unique()))
+    q = st.text_input("Search comment title and text")
+    dff = df[df["stance"].isin(stance)]
+    if q:
+        dff = dff[dff["text"].fillna("").str.contains(q, case=False, regex=False)]
+
+with cex_right:
+    filter_tone = st.multiselect("Filter tone", sorted(df["tone"].dropna().unique()), default=sorted(df["tone"].dropna().unique()))
+    st.text(""); st.text("")
+    st.text("Showing " + str(len(dff))+ " comments",text_alignment="right", width="stretch")
 
 st.dataframe(dff[["comment_id", "title", "text", "stance", "stance_confidence", "tone"]], width="stretch")
-st.write("Showing " + str(len(dff))+ " comments")
 
-cid = st.selectbox("comment", dff["comment_id"].astype(str))
+cid = st.selectbox("Select comment to view:", dff["comment_id"].astype(str))
 row = dff[dff["comment_id"].astype(str) == cid].iloc[0]
 
-st.subheader(row["title"])
-st.write(row["text"])
-st.write(row["author"] + ", " + row["date"][:10])
-st.markdown(f"**stance:** {row['stance']} \t|\t **confidence:** {row['stance_confidence']:.2f} \t|\t **tone:** {row['tone']}")
-st.write("**analysis:** "+ row["stance_rationale"])
+st.markdown(f'**{row["title"]}**')
+st.text(row["text"])
+st.write(row["author"] + ", " + row["date_dt"].strftime("%D"))
+
+st.divider()
+
+st.subheader('Analysis')
+cexs_left, cexs_right = st.columns([1,1])
+with cexs_left:
+    st.write(f"**stance:** {row['stance']}")
+    st.write(f"**stance_confidence:** {row['stance_confidence']:.2f}")
+    st.write(f"**tone:** {row['tone']}")
+    st.write("**analysis:** "+ row["stance_rationale"])
+with cexs_right:
+    x_order = ["unknown","oppose","mixed","neutral","support"]  # includes mixed even if absent; harmless zero column
+    y_order = ["positive","neutral","mixed","negative","unclear"]
+    tab = pd.crosstab(df["tone"], df["stance"]).reindex(index=y_order, columns=x_order, fill_value=0)
+    pct = tab.div(tab.sum(axis=1).replace(0, pd.NA), axis=0).fillna(0)
+    tone_stance = px.imshow(
+        pct,
+        x=x_order, y=y_order,
+        text_auto=".0%",
+        aspect="auto",
+        color_continuous_scale="Greens",
+    )
+    tone_stance.update_traces(text=tab.astype(str) + " / " + (pct*100).round(0).astype(int).astype(str) + "%")
+    tone_stance.add_scatter(x=[row["stance"]],y=[row["tone"]],mode="markers",marker=dict(size=15,color="yellow",symbol="cross",line=dict(width=1, color="red")),showlegend=False)
+    tone_stance.update_layout(height=420, xaxis_title="stance", yaxis_title="tone")
+    st.plotly_chart(tone_stance, width='stretch')
+    st.caption("Tone by stance, % within tone", text_alignment="right",width="stretch")
+
+st.divider()
 st.write("**model:** " + str(row["model"]))
 with st.expander("Prompt", expanded=False):
     st.code(prompt, language="text")
+
+tone_conf = px.box(df,x="stance",y="stance_confidence",color="stance",category_orders={"stance":stance_order},color_discrete_map=stance_colors,points="outliers",title="Comment Stance Classification Confidence")
+tone_conf.update_yaxes(range=[0,1.02])
+tone_conf.update_layout(height=430, legend_orientation="v")
+st.plotly_chart(tone_conf,width="stretch")

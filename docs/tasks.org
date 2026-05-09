@@ -314,8 +314,59 @@ fix mojibake in scraped text before analysis/reporting, especially curly quotes 
 - before/after sample: N/A — f452.jsonl is clean; tests cover synthetic mojibake patterns
 - datetime: [2026-05-07 Thu 17:00]
 
-* [ ] t1.4: graph data prep
-create a script ./viz/prototype_charts.py generating individual plotly charts for exploring graphs to embed into streamlit or dash later
+* [X] t1.4: graph data prototype
+create ./viz/prototype_charts.py generating individual plotly charts for exploring graphs to embed into streamlit or dash later
+
+** acceptance criteria
+2. create graph for Stance/Share
+   - stacked h-bar with % support/oppose/neutral/unknown + raw totals, eg  63% (5720) / 37% (3320) / 0.09% (8) / 0.37% (34)
+   - later, consider centered diverging h-bar: oppose ← | neutral/unknown | → support
+3. create graph for Stance/Time: 
+   - cumulative support/oppose % over time
+4. create graph for Stance/Tone (heatmap count)
+5. create graph for Confidence/Stance (boxplot or histogram)
+
+** notes
+- prototyped in plotly
+- initial streamlit  
+
+** evidence
+- commit: 3fb424d
+- tests: see viz/proto and viz/chart_tests
+- datetime: [2026-05-08 Fri 08:38]
+
+* [ ] t1.5: streamlit
+create organized webpage displaying useful information from completed job and analysis
+
+** acceptance criteria
+1. display total stance breakdown
+2. display centered horiz-bar with absolute stances
+3. show daily comment stances and cumulative
+4. show comment table with filters for stance (filter tone?)
+5. clicking/selecting a comment shows full text and model rationale
+6. app runs locally with one command
+
+** notes
+data pulls entirely from the job; goal is to point viz/streamlit.py at any job/ folder and have everything it needs
+
+** evidence
+- commit: 
+- tests: from root dir, `streamlit run viz/streamlit.py`
+
+7. add forum_url, forum_collected_date to scraper
+
+* [ ] t1.6 host streamlit
+figure out how to host this, locally or via streamlit servers
+   
+* === Backlog ===
+
+* [ ] X: complete proposal information
+Ensure we capture as much useful information as possible about the actual proposal - contact information, etc. what the state actually says about what was posted. 
+** acceptance criteria
+1. Item: `Forum` stores id, url, proposal title, description, open/close date, number of comments, agency, board, guidance document id
+   - add details for guidanceDoc, publication date, comments, guidance docs - eg: https://www.townhall.virginia.gov/L/GDocForum.cfm?GDocForumID=452
+2. Item: `Comment` stores forum_id, comment_id, author, title, text, date, url
+* [ ] X: add helper data to create_csv
 1. in create_csv.py, create helper columns:
    - stance_signed = {"support":1, "oppose":-1, "neutral":0, "unknown":0}
    - stance_weighted = stance_signed * stance_confidence
@@ -325,38 +376,3 @@ create a script ./viz/prototype_charts.py generating individual plotly charts fo
    - text_norm
    - text_hash
    - confidence_bucket = 'low' <.7 | 'med' .7-.89 | 'high' >=.9
-
-2. add forum_url, forum_collected_date to scraper
-        
-2. create graph for Stance/Share
-   - stacked h-bar with % support/oppose/neutral/unknown + raw totals, eg  63% (5720) / 37% (3320) / 0.09% (8) / 0.37% (34)
-   - later, consider centered diverging h-bar: oppose ← | neutral/unknown | → support
-3. create graph for Stance/Time: 
-   - cumulative support/oppose % over time
-4. create graph for Stance/Tone (heatmap count)
-5. create graph for Confidence/Stance (boxplot or histogram)
-   
-
-** acceptance criteria
-1. load parquet/csv review dataset
-2. show stance counts, tone counts, tag counts, and confidence histogram
-3. provide filters for stance, tone, confidence, tag, and text search
-4. show filtered comment table
-5. clicking/selecting a comment shows full text and model rationale
-6. app runs locally with one command
-
-** notes
-
-** evidence
-- commit:
-- tests:
-- datetime:
-    
-* === Backlog ===
-
-* [ ] X: complete proposal information
-Ensure we capture as much useful information as possible about the actual proposal - contact information, etc. what the state actually says about what was posted. 
-** acceptance criteria
-1. Item: `Forum` stores id, url, proposal title, description, open/close date, number of comments, agency, board, guidance document id
-   - add details for guidanceDoc, publication date, comments, guidance docs - eg: https://www.townhall.virginia.gov/L/GDocForum.cfm?GDocForumID=452
-2. Item: `Comment` stores forum_id, comment_id, author, title, text, date, url
