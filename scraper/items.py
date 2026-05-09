@@ -5,6 +5,8 @@ class ForumItem(scrapy.Item):
     forum_id  = scrapy.Field()
     reg_title = scrapy.Field()
     reg_desc  = scrapy.Field()
+    scraped_at = scrapy.Field()
+    forum_url = scrapy.Field()
 
 
 class CommentItem(scrapy.Item):

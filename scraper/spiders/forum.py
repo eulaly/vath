@@ -63,6 +63,8 @@ class ForumSpider(scrapy.Spider):
                 forum_id=self.forum_id,
                 reg_title=reg_title,
                 reg_desc=reg_desc,
+                scraped_at=datetime.utcnow().isoformat(),
+                forum_url=_view_url(self.forum_id),
             )
             for page in range(2, last_page + 1):
                 yield scrapy.FormRequest(
