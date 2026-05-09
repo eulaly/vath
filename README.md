@@ -7,7 +7,7 @@
 2.  Make data and insights broadly available.
 3.  Generalize to other public comment tools.
 
-![img](./docs/streamlit-snapshot.svg)
+![img](./docs/streamlit-snapshot.png)
 <a id="org1a2b8b3"></a>
 
 ### Research questions
