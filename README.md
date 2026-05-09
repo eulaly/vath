@@ -94,15 +94,15 @@ We selected gpt-5.4-mini for a good balance of quality, cost, and time.
 -   Each scraped forum is saved to `output/<forum-id>.jsonl`
 -   Each report (forum + prompt) is saves to `reports/<forum-id-N>.json`
 -   Each job is saved to `analysis/jobs/<report-id>`:
-     └─`forum.jsonl` is a copy of the scraped forum for convenience
-     └─`prompt.txt` is a copy of the prompt used
-     └─`report.json` is a copy of the report used
-     └─`status.json` contains metadata about the job
-    For each batch in the job, four files are created:
-     └─`jobN-input.jsonl` contains the exact queries sent to the API, for troubleshooting
-     └─`jobN-output-raw.jsonl` contains the exact response from the API
-     └─`jobN-output.jsonl` contains the exact response from the API
-     └─`jobN-output-errors.jsonl` when errors are returned (this file may not exist)
+     └─`forum.jsonl` is a copy of the scraped forum for convenience  
+     └─`prompt.txt` is a copy of the prompt used  
+     └─`report.json` is a copy of the report used  
+     └─`status.json` contains metadata about the job  
+    For each batch in the job, four files are created:  
+     └─`jobN-input.jsonl` contains the exact queries sent to the API, for troubleshooting  
+     └─`jobN-output-raw.jsonl` contains the exact response from the API  
+     └─`jobN-output.jsonl` contains the exact response from the API  
+     └─`jobN-output-errors.jsonl` when errors are returned (this file may not exist)  
 -   Once complete, the cleanup script saves `review.csv`, `review.pqt`, and `review.sqlite` in this folder.
 
 
